@@ -1,0 +1,22 @@
+[package]
+name = "eden-utils"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+chrono.workspace = true
+dotenvy.workspace = true
+error-stack.workspace = true
+serde.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+strum_macros = "0.26.4"
+thiserror.workspace = true
+tokio.workspace = true
+tracing-error.workspace = true
+
+[lints]
+workspace = true

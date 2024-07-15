@@ -1,0 +1,66 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0-alpha.0"
+authors = ["memothelemo <dev@memothelemo.xyz>"]
+edition = "2021"
+license = "AGPL-2.0"
+rust-version = "1.79.0"
+
+###################################################################################
+[workspace.dependencies]
+eden-db = { path = "crates/database" }
+eden-utils = { path = "crates/utils" }
+
+chrono = { version = "0.4.38", features = ["serde"] }
+rust_decimal = "1.35.0"
+serde_json = "1.0.120"
+uuid = { version = "1.10.0", features = ["serde", "v4"] }
+
+async-trait = "0.1.80"
+thiserror = "1.0.61"
+
+hex = "0.4.3"
+sha2 = "0.10.8"
+
+dotenvy = "0.15.7"
+error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "f52d870" }
+futures = "0.3.30"
+serde = { version = "1.0.204", features = ["derive"] }
+tokio = { version = "1.38.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-error = "0.2.0"
+
+# twilight (discord api crate) dependencies
+twilight-model = "0.15.4"
+
+[workspace.dependencies.sqlx]
+version = "0.7.4"
+features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "chrono", "rust_decimal", "json", "uuid"]
+
+[workspace.lints.clippy]
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+missing_safety_doc = "allow"
+
+cast_lossless = "deny"
+dbg_macro = "deny"
+expect_used = "deny"
+get_first = "deny"
+implicit_clone = "deny"
+let_underscore_must_use = "deny"
+manual_string_new = "deny"
+pedantic = "deny"
+single-match = "deny"
+too_many_lines = "deny"
+uninlined_format_args = "allow"
+unused_self = "deny"
+unwrap_used = "deny"
+
+[workspace.lints.rust]
+nonstandard_style = "deny"
+rust_2018_idioms = "deny"

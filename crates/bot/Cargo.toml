@@ -1,0 +1,20 @@
+[package]
+name = "eden-bot"
+description = "The actual implementation of Eden, the Discord bot."
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+eden-db.workspace = true
+eden-utils.workspace = true
+
+# twilight crates
+twilight-gateway = { version = "0.15.4", features = ["rustls-native-roots", "zlib-simd"] }
+twilight-http = { version = "0.15.4", default-features = false, features = ["rustls-native-roots", "decompression"] }
+twilight-model.workspace = true
+
+[lints]
+workspace = true
