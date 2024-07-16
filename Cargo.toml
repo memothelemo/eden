@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "eden"]
 resolver = "2"
 
 [workspace.package]
@@ -9,32 +9,46 @@ edition = "2021"
 license = "AGPL-2.0"
 rust-version = "1.79.0"
 
-###################################################################################
 [workspace.dependencies]
+# eden crates
 eden-db = { path = "crates/database" }
 eden-utils = { path = "crates/utils" }
 
+# types
 chrono = { version = "0.4.38", features = ["serde"] }
+dashmap = "6.0.1"
 rust_decimal = "1.35.0"
 serde_json = "1.0.120"
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
 
-async-trait = "0.1.80"
+# core crates
+error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "f52d870" }
+
+# macros
 thiserror = "1.0.61"
 
+# user configuration
+dotenvy = "0.15.7"
+
+# serialization, encoding and compression
 hex = "0.4.3"
+serde = { version = "1.0.204", features = ["derive"] }
 sha2 = "0.10.8"
 
-dotenvy = "0.15.7"
-error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "f52d870" }
+# async related
+async-trait = "0.1.80"
 futures = "0.3.30"
-serde = { version = "1.0.204", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["full"] }
+
+# tracing/logging
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 
-# twilight (discord api crate) dependencies
+# twilight crates
 twilight-model = "0.15.4"
+
+# testing
+static_assertions = "1.1.0"
 
 [workspace.dependencies.sqlx]
 version = "0.7.4"

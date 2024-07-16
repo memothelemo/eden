@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{NaiveDate, TimeDelta, Utc};
 use eden_utils::error::ResultExt;
 use eden_utils::Result;
 use rust_decimal::prelude::FromPrimitive;
@@ -7,10 +7,27 @@ use twilight_model::id::marker::UserMarker;
 use twilight_model::id::Id;
 
 use crate::forms::{
-    InsertAdminForm, InsertBillForm, InsertIdentityForm, InsertPayerForm, InsertPaymentForm,
+    InsertAdminForm, InsertBillForm, InsertIdentityForm, InsertJobForm, InsertPayerForm,
+    InsertPaymentForm,
 };
 use crate::payment::{PaymentData, PaymentMethod};
-use crate::schema::{Admin, Bill, Identity, Payer, Payment};
+use crate::schema::{Admin, Bill, Identity, Job, JobPriority, JobTask, Payer, Payment};
+
+pub async fn generate_job(conn: &mut sqlx::PgConnection) -> Result<Job> {
+    let form = InsertJobForm::builder()
+        .name("foo")
+        .deadline(Utc::now())
+        .priority(JobPriority::default())
+        .task(JobTask::BillPayer {
+            currency: "PHP".into(),
+            deadline: Utc::now(),
+            payer_id: Id::new(613425648685547541),
+            price: Decimal::from_f64(15.).unwrap(),
+        })
+        .build();
+
+    Job::insert(conn, form).await.anonymize_error()
+}
 
 #[must_use]
 pub fn generate_mynt_payment() -> PaymentMethod {
@@ -109,4 +126,71 @@ pub async fn generate_bill(conn: &mut sqlx::PgConnection) -> Result<Bill> {
         .build();
 
     Bill::insert(conn, form).await.anonymize_error()
+}
+
+pub async fn prepare_sample_jobs(conn: &mut sqlx::PgConnection) -> eden_utils::Result<()> {
+    // prepare 5 sample deadlines
+    let deadline_1 = Utc::now();
+    let deadline_2 = deadline_1
+        .checked_add_signed(TimeDelta::seconds(5))
+        .unwrap();
+
+    let deadline_3 = deadline_2
+        .checked_add_signed(TimeDelta::seconds(3))
+        .unwrap();
+
+    let deadline_4 = deadline_3
+        .checked_add_signed(TimeDelta::seconds(1))
+        .unwrap();
+
+    let deadline_5 = deadline_4
+        .checked_add_signed(TimeDelta::milliseconds(500))
+        .unwrap();
+
+    // Then prepare these jobs for some reason :)
+    let task = JobTask::BillPayer {
+        currency: "USD".into(),
+        deadline: Utc::now(),
+        payer_id: Id::new(273534239310479360),
+        price: Decimal::from_f64(1.).unwrap(),
+    };
+
+    // Prepare a list of jobs (situation stuff)
+    // - deadline_1 - high priority
+    // - deadline_2 - low priority
+    // - deadline_1 - medium priority
+    // - deadline_3 - high priority and so on
+    macro_rules! shorthand_insert {
+        ($deadline:ident, $priority:ident) => {{
+            Job::insert(
+                conn,
+                InsertJobForm::builder()
+                    .deadline($deadline)
+                    .name("foo")
+                    .priority(JobPriority::$priority)
+                    .task(task.clone())
+                    .build(),
+            )
+            .await
+            .anonymize_error()?;
+        }};
+    }
+
+    shorthand_insert!(deadline_1, High);
+    shorthand_insert!(deadline_3, Low);
+    shorthand_insert!(deadline_4, High);
+    shorthand_insert!(deadline_1, Low);
+    shorthand_insert!(deadline_5, High);
+    shorthand_insert!(deadline_2, Low);
+    shorthand_insert!(deadline_5, Medium);
+    shorthand_insert!(deadline_1, Medium);
+    shorthand_insert!(deadline_3, High);
+    shorthand_insert!(deadline_5, Low);
+    shorthand_insert!(deadline_2, High);
+    shorthand_insert!(deadline_4, Medium);
+    shorthand_insert!(deadline_2, Medium);
+    shorthand_insert!(deadline_3, Medium);
+    shorthand_insert!(deadline_4, Low);
+
+    Ok(())
 }

@@ -106,6 +106,13 @@ pub trait PagedQuery {
     }
 
     fn build_sql(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+
+    fn prerun(
+        &self,
+        _conn: &mut sqlx::PgConnection,
+    ) -> impl std::future::Future<Output = eden_utils::Result<(), QueryError>> + Send {
+        futures::future::ok(())
+    }
 }
 
 struct PaginationResult<T> {
