@@ -55,6 +55,7 @@ impl Error {
         }
     }
 
+    #[track_caller]
     pub fn transform_context<C>(self, context: C) -> Error<C>
     where
         C: Context,
@@ -67,6 +68,7 @@ impl Error {
         }
     }
 
+    #[track_caller]
     pub fn change_context_slient<C>(mut self, context: C) -> Self
     where
         C: Context,
@@ -97,6 +99,7 @@ impl<T: Context> Error<T> {
         }
     }
 
+    #[track_caller]
     pub fn change_context<C>(self, context: C) -> Error<C>
     where
         C: Context,
@@ -109,6 +112,7 @@ impl<T: Context> Error<T> {
         }
     }
 
+    #[track_caller]
     pub fn anonymize(self) -> Error {
         Error {
             category: self.category,

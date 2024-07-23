@@ -47,13 +47,13 @@ impl Job {
         form: InsertJobForm<'_>,
     ) -> Result<Self, QueryError> {
         // It has to be serialized before giving it to the database
-        let task = serde_json::to_value(&form.task)
+        let data = serde_json::to_value(&form.data)
             .anonymize_error()
             .transform_context(QueryError)
             .attach_printable("could not serialize task to insert job")?;
 
         sqlx::query_as::<_, Job>(
-            r"INSERT INTO jobs (name, deadline, priority, status, task)
+            r"INSERT INTO jobs (name, deadline, priority, status, data)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *",
         )
@@ -61,7 +61,7 @@ impl Job {
         .bind(form.deadline)
         .bind(form.priority)
         .bind(form.status)
-        .bind(task)
+        .bind(data)
         .fetch_one(conn)
         .await
         .change_context(QueryError)
@@ -79,8 +79,9 @@ impl Job {
                 failed_attempts = COALESCE($2, failed_attempts),
                 last_retry = COALESCE($3, last_retry),
                 priority = COALESCE($4, priority),
-                status = COALESCE($5, status)
-            WHERE id = $6
+                status = COALESCE($5, status),
+                data = COALESCE($6, data)
+            WHERE id = $7
             RETURNING *",
         )
         .bind(form.deadline)
@@ -88,6 +89,8 @@ impl Job {
         .bind(form.last_retry)
         .bind(form.priority)
         .bind(form.status)
+        // sqlx treated serde_json::Value value as jsonb type
+        .bind(sqlx::types::Json(form.data))
         .bind(id)
         .fetch_optional(conn)
         .await
@@ -121,14 +124,11 @@ impl Job {
 #[allow(clippy::unwrap_used, clippy::unreadable_literal)]
 #[cfg(test)]
 mod tests {
-    use crate::schema::{JobPriority, JobStatus, JobTask};
+    use crate::schema::{JobPriority, JobStatus};
     use crate::test_utils;
 
-    use chrono::Utc;
-    use rust_decimal::{prelude::FromPrimitive, Decimal};
-    use twilight_model::id::Id;
-
     use super::*;
+    use chrono::Utc;
 
     #[sqlx::test(migrator = "crate::MIGRATOR")]
     async fn test_from_id(pool: sqlx::PgPool) -> eden_utils::Result<()> {
@@ -156,12 +156,12 @@ mod tests {
 
         let name = "clean dump";
         let deadline = Utc::now();
-        let task = JobTask::BillPayer {
-            currency: "PHP".into(),
-            deadline: Utc::now(),
-            payer_id: Id::new(613425648685547541),
-            price: Decimal::from_f64(15.).unwrap(),
-        };
+        let task = serde_json::json!({
+            "currency": "PHP",
+            "deadline": Utc::now(),
+            "payer_id": "613425648685547541",
+            "price": 15.0,
+        });
 
         let form = InsertJobForm::builder()
             .name("clean dump")
@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(job.failed_attempts, 0);
         assert_eq!(job.priority, JobPriority::High);
         assert_eq!(job.status, JobStatus::Queued);
-        assert_eq!(job.task, task);
+        assert_eq!(serde_json::to_value(job.data.inner).unwrap(), task);
 
         Ok(())
     }

@@ -1,8 +1,14 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use std::time::{Instant, SystemTime};
 
 use crate::internal::Sealed;
 
+#[must_use]
+pub fn later(delta: TimeDelta) -> DateTime<Utc> {
+    Utc::now() + delta
+}
+
+///////////////////////////////////////////////
 pub trait InstantExt: Sealed {
     /// Gets the timestamp of this [`Instant`] object was created.
     fn started(&self) -> DateTime<Utc>;

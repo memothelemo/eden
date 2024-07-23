@@ -1,8 +1,8 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as Json;
 use sqlx::Row;
-use twilight_model::id::{marker::UserMarker, Id};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::utils::naive_to_dt;
@@ -18,7 +18,15 @@ pub struct Job {
     pub last_retry: Option<DateTime<Utc>>,
     pub priority: JobPriority,
     pub status: JobStatus,
-    pub task: JobTask,
+    pub data: JobData,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct JobData {
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(flatten)]
+    pub inner: HashMap<String, Json>,
 }
 
 impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Job {
@@ -32,39 +40,35 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Job {
         let last_retry = row.try_get::<Option<NaiveDateTime>, _>("last_retry")?;
         let priority = row.try_get("priority")?;
         let status = row.try_get("status")?;
-
-        let task = row.try_get::<serde_json::Value, _>("task")?;
-        let task = serde_json::from_value(task).map_err(|e| sqlx::Error::ColumnDecode {
-            index: "task".into(),
-            source: Box::new(e),
-        })?;
+        // sqlx treated serde_json::Value value as jsonb type
+        let data = row.try_get::<sqlx::types::Json<JobData>, _>("data")?;
 
         Ok(Self {
             id,
             created_at: naive_to_dt(created_at),
             name,
             updated_at: updated_at.map(naive_to_dt),
+            data: data.0,
             deadline: naive_to_dt(deadline),
             failed_attempts,
             last_retry: last_retry.map(naive_to_dt),
             priority,
             status,
-            task,
         })
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum JobTask {
-    // This is applicable for special payments
-    BillPayer {
-        currency: String,
-        deadline: DateTime<Utc>,
-        payer_id: Id<UserMarker>,
-        price: Decimal,
-    },
-}
+// #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+// #[serde(tag = "type", rename_all = "snake_case")]
+// pub enum JobTask {
+//     // This is applicable for special payments
+//     BillPayer {
+//         currency: String,
+//         deadline: DateTime<Utc>,
+//         payer_id: Id<UserMarker>,
+//         price: Decimal,
+//     },
+// }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, sqlx::Type)]
 #[sqlx(type_name = "job_priority", rename_all = "lowercase")]

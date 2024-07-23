@@ -28,11 +28,11 @@ CREATE TABLE jobs (
     "name" VARCHAR(50) NOT NULL,
     "updated_at" TIMESTAMP,
 
+    "data" JSON NOT NULL,
     "deadline" TIMESTAMP NOT NULL,
     "failed_attempts" INTEGER NOT NULL DEFAULT 0,
     "last_retry" TIMESTAMP,
     "priority" JOB_PRIORITY NOT NULL DEFAULT 'medium',
-    "status" JOB_STATUS NOT NULL DEFAULT 'queued',
-    "task" JSON NOT NULL
+    "status" JOB_STATUS NOT NULL DEFAULT 'queued'
 );
 SELECT manage_updated_at('jobs');

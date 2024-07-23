@@ -11,19 +11,19 @@ use crate::forms::{
     InsertPaymentForm,
 };
 use crate::payment::{PaymentData, PaymentMethod};
-use crate::schema::{Admin, Bill, Identity, Job, JobPriority, JobTask, Payer, Payment};
+use crate::schema::{Admin, Bill, Identity, Job, JobData, JobPriority, Payer, Payment};
 
 pub async fn generate_job(conn: &mut sqlx::PgConnection) -> Result<Job> {
     let form = InsertJobForm::builder()
         .name("foo")
         .deadline(Utc::now())
         .priority(JobPriority::default())
-        .task(JobTask::BillPayer {
-            currency: "PHP".into(),
-            deadline: Utc::now(),
-            payer_id: Id::new(613425648685547541),
-            price: Decimal::from_f64(15.).unwrap(),
-        })
+        .task(serde_json::json!({
+            "currency": "PHP",
+            "deadline": Utc::now(),
+            "payer_id": "613425648685547541",
+            "price": 15.0,
+        }))
         .build();
 
     Job::insert(conn, form).await.anonymize_error()
@@ -148,12 +148,12 @@ pub async fn prepare_sample_jobs(conn: &mut sqlx::PgConnection) -> eden_utils::R
         .unwrap();
 
     // Then prepare these jobs for some reason :)
-    let task = JobTask::BillPayer {
-        currency: "USD".into(),
-        deadline: Utc::now(),
-        payer_id: Id::new(273534239310479360),
-        price: Decimal::from_f64(1.).unwrap(),
-    };
+    let task = serde_json::json!({
+        "currency": "PHP",
+        "deadline": Utc::now(),
+        "payer_id": "613425648685547541",
+        "price": 15.0,
+    });
 
     // Prepare a list of jobs (situation stuff)
     // - deadline_1 - high priority
@@ -168,7 +168,10 @@ pub async fn prepare_sample_jobs(conn: &mut sqlx::PgConnection) -> eden_utils::R
                     .deadline($deadline)
                     .name("foo")
                     .priority(JobPriority::$priority)
-                    .task(task.clone())
+                    .data(JobData {
+                        kind: "foo".into(),
+                        inner: task.clone(),
+                    })
                     .build(),
             )
             .await
