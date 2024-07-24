@@ -36,3 +36,29 @@ CREATE TABLE jobs (
     "status" JOB_STATUS NOT NULL DEFAULT 'queued'
 );
 SELECT manage_updated_at('jobs');
+
+CREATE OR REPLACE FUNCTION check_job_data()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    -- data must not be null
+    IF (NEW.data IS NULL) THEN
+        RETURN NEW.data;
+    END IF;
+
+    IF (json_typeof(NEW.data::json) != 'object') THEN
+        RAISE EXCEPTION '"data" column is not a JSON object';
+    END IF;
+
+    IF (NEW.data->>'type' IS NULL) THEN
+        RAISE EXCEPTION '"data.type" is missing';
+    END IF;
+
+    RETURN NEW;
+END
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER check_job_data
+BEFORE INSERT OR UPDATE ON jobs
+FOR EACH ROW EXECUTE PROCEDURE check_job_data();
