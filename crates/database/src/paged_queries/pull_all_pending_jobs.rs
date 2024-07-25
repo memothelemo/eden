@@ -41,7 +41,11 @@ impl PagedQuery for PullAllPendingJobs {
         // this is to better differentiate which jobs are updated now
         async {
             sqlx::query(
-                r"UPDATE jobs SET status = $1, updated_at = $3
+                r"UPDATE jobs SET status = $1, updated_at = $3,
+                last_retry = CASE WHEN failed_attempts > 0
+                    THEN $3
+                    ELSE last_retry
+                END
                 WHERE failed_attempts < $2 AND deadline <= $3",
             )
             .bind(JobStatus::Running)

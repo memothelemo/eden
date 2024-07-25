@@ -1,6 +1,6 @@
 use crate::runner::catch_unwind::CatchUnwindJobFuture;
 use crate::runner::JobTimedOut;
-use crate::{Job, JobRunner, JobSchedule, JobStatus, Schedule};
+use crate::{Job, JobResult, JobRunner, JobSchedule, Schedule};
 
 use chrono::{DateTime, Utc};
 use eden_db::forms::InsertJobForm;
@@ -21,39 +21,50 @@ pub struct JobRegistryMeta<S> {
     pub(crate) schedule: ScheduleFn,
 }
 
-pub type ScheduleFn = Box<dyn Fn() -> JobSchedule>;
-pub type DeserializerFn<State> = Box<
-    dyn Fn(
-            Json,
-        ) -> std::result::Result<
-            Box<dyn Job<State = State>>,
-            Box<dyn std::error::Error + Send + Sync>,
-        > + Send
-        + Sync
-        + 'static,
->;
+pub type DeserializerFn<State> =
+    Box<dyn Fn(Json) -> serde_json::Result<Box<dyn Job<State = State>>> + Send + Sync + 'static>;
 
-pub fn provide_job_data_if_error<T, S>(
+pub type ScheduleFn = Box<dyn Fn() -> JobSchedule + Send + Sync + 'static>;
+
+pub struct ProvidedJobData;
+
+pub fn provide_job_data_if_error<T, E, S>(
     data: &JobSchema,
-    job: &dyn Job<State = S>,
+    job: Option<&dyn Job<State = S>>,
     last_executed: DateTime<Utc>,
-    registry_meta: &JobRegistryMeta<S>,
-    result: Result<T, RunJobError>,
-) -> Result<T, RunJobError>
+    registry_meta: Option<&JobRegistryMeta<S>>,
+    result: Result<T, E>,
+) -> Result<T, E>
 where
+    E: eden_utils::error::Context,
     S: Clone + Send + Sync + 'static,
 {
+    let mut result = match result {
+        Ok(n) => return Ok(n),
+        Err(error) if error.contains::<ProvidedJobData>() => return Err(error),
+        res => res,
+    };
+
+    result = result
+        .attach_printable(format!("job.id = {:?}", data.id))
+        .attach_printable(format!("job.created_at = {:?}", data.created_at))
+        .attach_printable(format!("job.deadline = {:?}", data.deadline))
+        .attach_printable(format!("job.failed_attempts = {:?}", data.failed_attempts))
+        .attach_printable(format!("job.last_retry = {:?}", data.last_retry))
+        .attach_printable(format!("job.priority = {:?}", data.priority))
+        .attach_printable(format!("job.data = {:?}", job));
+
+    if let Some(registry_meta) = registry_meta {
+        result = result.attach_printable(format!("job.data.type = {:?}", registry_meta.kind))
+    }
+
+    if let Some(job) = job {
+        result = result.attach_printable(format!("job.timeout = {:?}", job.timeout()))
+    }
+
     result
-        .attach_printable_lazy(|| format!("job.id = {:?}", data.id))
-        .attach_printable_lazy(|| format!("job.created_at = {:?}", data.created_at))
-        .attach_printable_lazy(|| format!("job.data.type = {:?}", registry_meta.kind))
-        .attach_printable_lazy(|| format!("job.deadline = {:?}", data.deadline))
-        .attach_printable_lazy(|| format!("job.failed_attempts = {:?}", data.failed_attempts))
-        .attach_printable_lazy(|| format!("job.last_retry = {:?}", data.last_retry))
-        .attach_printable_lazy(|| format!("job.priority = {:?}", data.priority))
-        .attach_printable_lazy(|| format!("job.timeout = {:?}", job.timeout()))
-        .attach_printable_lazy(|| format!("job.data = {:?}", job))
-        .attach_printable_lazy(|| format!("last executed: {:?}", last_executed.to_rfc3339()))
+        .attach_printable(format!("last executed: {:?}", last_executed.to_rfc3339()))
+        .attach(ProvidedJobData)
 }
 
 fn serialize_job<J, S>(job: &J) -> Result<JobRawData, SerializeJobError>
@@ -72,7 +83,7 @@ pub async fn run_job<S>(
     runner: &JobRunner<S>,
     job: &dyn Job<State = S>,
     registry_meta: &JobRegistryMeta<S>,
-) -> Result<JobStatus, RunJobError>
+) -> Result<JobResult, RunJobError>
 where
     S: Clone + Send + Sync + 'static,
 {

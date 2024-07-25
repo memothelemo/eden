@@ -1,4 +1,9 @@
+use chrono::Utc;
 use dashmap::DashMap;
+use eden_db::forms::UpdateJobForm;
+use eden_db::schema::Job as JobSchema;
+use eden_db::schema::JobStatus;
+use eden_utils::error::AnyResultExt;
 use eden_utils::error::ResultExt;
 use eden_utils::Result;
 use serde::{de::DeserializeOwned, Serialize};
@@ -10,11 +15,12 @@ mod error;
 mod internal;
 mod schedule;
 
-use self::error::*;
 use self::internal::*;
 use crate::Job;
+use crate::JobResult;
 
 pub use self::config::*;
+pub use self::error::*;
 pub use self::schedule::*;
 
 #[allow(private_interfaces)]
@@ -34,6 +40,96 @@ where
 {
     pub async fn clear_all(&self) -> Result<u64, ClearAllJobsError> {
         internal::clear_all_queued_jobs(self).await
+    }
+
+    pub async fn queue_failed_jobs(&self) -> Result<(), QueueFailedJobsError> {
+        let mut conn = self
+            .transaction()
+            .await
+            .transform_context(QueueFailedJobsError)
+            .attach_printable("could not start database transaction")?;
+
+        let mut queue = JobSchema::get_all().status(JobStatus::Failed).build();
+        let now = Utc::now();
+
+        while let Some(jobs) = queue
+            .next(&mut conn)
+            .await
+            .change_context(QueueFailedJobsError)
+            .attach_printable("could not pull failed jobs")?
+        {
+            for job in jobs {
+                let form = UpdateJobForm::builder()
+                    .status(Some(JobStatus::Failed))
+                    .build();
+
+                internal::provide_job_data_if_error::<_, _, S>(
+                    &job,
+                    None,
+                    now,
+                    None,
+                    JobSchema::update(&mut conn, job.id, form)
+                        .await
+                        .change_context(QueueFailedJobsError)
+                        .attach_printable("could not update status of a failed job"),
+                )?;
+            }
+        }
+
+        conn.commit()
+            .await
+            .change_context(QueueFailedJobsError)
+            .attach_printable("could not commit database transaction")?;
+
+        Ok(())
+    }
+
+    pub async fn process_routine_jobs(&self) -> Result<(), ProcessRoutineJobsError> {
+        todo!()
+    }
+
+    pub async fn process_queued_jobs(&self) -> Result<(), ProcessQueuedJobsError> {
+        let mut conn = self
+            .transaction()
+            .await
+            .transform_context(ProcessQueuedJobsError)
+            .attach_printable("could not start database transaction")?;
+
+        // There are 32 bits to work for this value.
+        let max_failed_attempts = self.0.config.max_failed_attempts as i64;
+        let now = Utc::now();
+
+        let mut queue = JobSchema::pull_all_pending(max_failed_attempts, Some(now)).size(50);
+        while let Some(jobs) = queue
+            .next(&mut conn)
+            .await
+            .change_context(ProcessQueuedJobsError)
+            .attach_printable("could not pull jobs")?
+        {
+            println!("pulled {} jobs", jobs.len());
+
+            for job in jobs {
+                let result = internal::provide_job_data_if_error::<_, _, S>(
+                    &job,
+                    None,
+                    now,
+                    None,
+                    self.try_run_unknown_job(&mut conn, &job).await,
+                )
+                .attach_printable("could not run job");
+
+                if let Err(error) = result {
+                    eprintln!("Could not run job: {}", error.anonymize());
+                }
+            }
+        }
+
+        conn.commit()
+            .await
+            .change_context(ProcessQueuedJobsError)
+            .attach_printable("could not commit database transaction")?;
+
+        Ok(())
     }
 
     pub async fn push<J>(&self, job: J) -> Result<(), QueueJobError>
@@ -68,6 +164,7 @@ where
             let job: J = serde_json::from_value(value)?;
             Ok(Box::new(job))
         });
+
         let metadata: JobRegistryMeta<S> = JobRegistryMeta {
             deserializer,
             kind: J::kind(),
@@ -83,6 +180,63 @@ impl<S> JobRunner<S>
 where
     S: Clone + Send + Sync + 'static,
 {
+    async fn transaction(&self) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
+        self.0.pool.begin().await.anonymize_error()
+    }
+
+    async fn try_run_unknown_job(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        schema: &JobSchema,
+    ) -> Result<(), RunJobError> {
+        // Search for that type of job from the registry
+        let kind = schema.data.kind.as_str();
+        let Some(registry_meta) = self.0.registry.get(kind) else {
+            return Err(eden_utils::Error::context(
+                eden_utils::ErrorCategory::Unknown,
+                RunJobError,
+            ))
+            .attach_printable(format!("unknown job {kind:?} (not registered in registry)"));
+        };
+
+        let deserializer = &*registry_meta.deserializer;
+        let job = deserializer(schema.data.data.clone())
+            .map_err(|e| eden_utils::Error::any(eden_utils::ErrorCategory::Unknown, e))
+            .transform_context(RunJobError)
+            .attach_printable_lazy(|| {
+                format!("could not deserialize job {:?}", registry_meta.kind)
+            })?;
+
+        println!(
+            "running job {} with type {:?}; data = {job:?}",
+            schema.id, registry_meta.kind
+        );
+
+        match internal::run_job(self, &*job, &registry_meta).await {
+            Ok(new_status) => match new_status {
+                JobResult::Completed => {
+                    println!("completed");
+                }
+                JobResult::Fail(_) => {
+                    println!("failed");
+                }
+                JobResult::RetryIn(_) => {
+                    println!("retry");
+                }
+            },
+            Err(error) => {
+                JobSchema::fail(conn, schema.id)
+                    .await
+                    .change_context(RunJobError)
+                    .attach_printable("could not fail job")?;
+
+                return Err(error);
+            }
+        }
+
+        Ok(())
+    }
+
     async fn queue_job<J>(&self, job: &J, schedule: Option<Schedule>) -> Result<(), QueueJobError>
     where
         J: Job<State = S> + Serialize,

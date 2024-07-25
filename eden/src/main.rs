@@ -25,8 +25,11 @@ impl Job for CleanupUsers {
         JobSchedule::interval(TimeDelta::seconds(5))
     }
 
-    fn run(&self, _state: Self::State) -> BoxFuture<'_, eden_utils::Result<JobStatus>> {
-        Box::pin(async { Ok(JobStatus::Completed) })
+    fn run(&self, _state: Self::State) -> BoxFuture<'_, eden_utils::Result<JobResult>> {
+        Box::pin(async {
+            panic!("Oops!");
+            Ok(JobResult::Completed)
+        })
     }
 }
 
@@ -47,9 +50,9 @@ async fn bootstrap() -> eden_utils::Result<()> {
     println!("deleted {deleted_jobs} jobs");
 
     runner.schedule(CleanupUsers, Schedule::now()).await?;
-    runner.push(CleanupUsers).await?;
 
-    dbg!(&runner);
+    runner.process_queued_jobs().await?;
+    runner.queue_failed_jobs().await?;
 
     Ok(())
 }

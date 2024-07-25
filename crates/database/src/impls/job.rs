@@ -15,7 +15,8 @@ impl Job {
             r"UPDATE jobs
             SET status = $1,
                 failed_attempts = failed_attempts + 1
-            WHERE id = $2",
+            WHERE id = $2
+            RETURNING *",
         )
         .bind(JobStatus::Failed)
         .bind(id)
@@ -37,8 +38,8 @@ impl Job {
             .attach_printable("could not get job from id")
     }
 
-    pub fn get_all() -> Paginated<GetAllJobs> {
-        Paginated::new(GetAllJobs)
+    pub fn get_all() -> GetAllJobs {
+        GetAllJobs::new()
     }
 
     pub fn pull_all_pending(

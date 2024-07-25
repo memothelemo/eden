@@ -3,21 +3,21 @@ use futures::{future::BoxFuture, Future, FutureExt};
 use std::task::Poll;
 
 use super::RunJobError;
-use crate::JobStatus;
+use crate::JobResult;
 
 #[must_use = "Futures are lazy, call `.await` to perform a job"]
 pub struct CatchUnwindJobFuture<'a> {
-    future: BoxFuture<'a, eden_utils::Result<JobStatus>>,
+    future: BoxFuture<'a, eden_utils::Result<JobResult>>,
 }
 
 impl<'a> CatchUnwindJobFuture<'a> {
-    pub fn new(future: BoxFuture<'a, eden_utils::Result<JobStatus>>) -> Self {
+    pub fn new(future: BoxFuture<'a, eden_utils::Result<JobResult>>) -> Self {
         Self { future }
     }
 }
 
 impl<'a> Future for CatchUnwindJobFuture<'a> {
-    type Output = eden_utils::Result<JobStatus, RunJobError>;
+    type Output = eden_utils::Result<JobResult, RunJobError>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
@@ -35,6 +35,7 @@ impl<'a> Future for CatchUnwindJobFuture<'a> {
     }
 }
 
+#[track_caller]
 fn catch_unwind<F: FnOnce() -> R, R>(f: F) -> eden_utils::Result<R, RunJobError> {
     #[derive(Debug)]
     pub struct JobPanicked(String);

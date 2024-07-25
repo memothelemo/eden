@@ -9,7 +9,7 @@ mod schedule;
 pub use self::schedule::*;
 
 #[derive(Debug)]
-pub enum JobStatus {
+pub enum JobResult {
     /// The job has completed its task.
     Completed,
     /// The job has encountered a fatal error and should not
@@ -57,7 +57,6 @@ pub trait Job: Debug + Send + Sync + 'static {
     /// If [`JobSchedule::None`] is none, it will be considered as persistent
     /// jobs and should be kept in the database for later use when needed.
     ///
-    ///
     /// It defaults to [`JobSchedule::None`].
     fn schedule() -> JobSchedule
     where
@@ -89,10 +88,10 @@ pub trait Job: Debug + Send + Sync + 'static {
 
     /// This function will attempt to perform a task from job.
     ///
-    /// Its return type, [`JobStatus`] determines whether the job needs to be
+    /// Its return type, [`JobResult`] determines whether the job needs to be
     /// retried again or ignored/retried again in a very later time after it
     /// receives a successful status.
-    fn run(&self, state: Self::State) -> BoxFuture<'_, Result<JobStatus>>;
+    fn run(&self, state: Self::State) -> BoxFuture<'_, Result<JobResult>>;
 }
 
 #[cfg(test)]
