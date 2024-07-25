@@ -448,7 +448,9 @@ name = "eden"
 version = "0.1.0-alpha.0"
 dependencies = [
  "eden-db",
+ "eden-scheduler",
  "eden-utils",
+ "sqlx",
  "thiserror",
  "tokio",
 ]
@@ -498,6 +500,8 @@ dependencies = [
  "sqlx",
  "static_assertions",
  "thiserror",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

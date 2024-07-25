@@ -5,9 +5,10 @@ mod into_impls;
 
 pub use self::category::*;
 pub use self::ext::*;
+pub use error_stack::Context;
 
 use self::any::{AnonymizedError, AnyError};
-use error_stack::{Context, Report};
+use error_stack::Report;
 use std::{fmt, marker::PhantomData};
 use tracing_error::SpanTrace;
 
@@ -120,6 +121,16 @@ impl<T: Context> Error<T> {
             trace: SpanTrace::capture(),
             _phantom: PhantomData,
         }
+    }
+}
+
+impl<T: Context> Error<T> {
+    #[must_use]
+    pub fn contains<N>(&self) -> bool
+    where
+        N: ?Sized + Send + Sync + 'static,
+    {
+        self.report.request_ref::<T>().next().is_some()
     }
 }
 

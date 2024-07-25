@@ -25,7 +25,6 @@ CREATE TABLE jobs (
     "created_at" TIMESTAMP WITHOUT TIME ZONE
         NOT NULL
         DEFAULT (now() at TIME ZONE ('utc')),
-    "name" VARCHAR(50) NOT NULL,
     "updated_at" TIMESTAMP,
 
     "data" JSONB NOT NULL,
@@ -35,7 +34,6 @@ CREATE TABLE jobs (
     "priority" JOB_PRIORITY NOT NULL DEFAULT 'medium',
     "status" JOB_STATUS NOT NULL DEFAULT 'queued'
 );
-SELECT manage_updated_at('jobs');
 
 CREATE OR REPLACE FUNCTION check_job_data()
     RETURNS TRIGGER

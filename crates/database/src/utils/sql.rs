@@ -7,6 +7,7 @@ use crate::QueryError;
 // TODO: explain about pagination
 #[must_use = "Paginated is a lazy object, use '.next()' to get a page of records"]
 pub struct Paginated<T> {
+    ran_prerun: bool,
     page: i64,
     size: i64,
     offset: Option<i64>,
@@ -32,6 +33,7 @@ where
 
     pub(crate) fn new(builder: T) -> Self {
         Self {
+            ran_prerun: false,
             page: 0,
             size: Self::DEFAULT_SIZE_PER_PAGE,
             offset: Some(0),
@@ -42,6 +44,7 @@ where
     #[allow(clippy::cast_possible_wrap)]
     pub fn size(mut self, size: u64) -> Self {
         // reset everything
+        self.ran_prerun = false;
         self.size = (size as i64).abs();
         self.page = 0;
         self.offset = Some(0);
@@ -52,6 +55,16 @@ where
         &mut self,
         conn: &mut sqlx::PgConnection,
     ) -> eden_utils::Result<Option<Vec<T::Output>>, QueryError> {
+        // Prerun first...
+        if !self.ran_prerun {
+            self.builder
+                .prerun(conn)
+                .await
+                .attach_printable("could not perform prerun")?;
+
+            self.ran_prerun = true;
+        }
+
         // Don't try go to the next page if offset is None
         let Some(offset) = self.offset.as_mut() else {
             return Ok(None);
@@ -84,7 +97,7 @@ where
             .attach_printable("could not paginate entries")?;
 
         let overall_total = results.first().map_or(0, |x| x.overall_total);
-        let records = results.into_iter().map(|x| x.data).collect();
+        let records: Vec<T::Output> = results.into_iter().map(|x| x.data).collect();
 
         // Does it exceeds the predicted amount of entries per page for the next page?
         let total_pages_read = *offset + self.size;
@@ -94,7 +107,12 @@ where
             None
         };
 
-        Ok(Some(records))
+        // expected to have some records
+        Ok(if records.is_empty() {
+            None
+        } else {
+            Some(records)
+        })
     }
 }
 

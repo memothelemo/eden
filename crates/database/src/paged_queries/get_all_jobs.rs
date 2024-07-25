@@ -8,7 +8,8 @@ impl PagedQuery for GetAllJobs {
     type Output = Job;
 
     fn build_sql(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("SELECT * FROM jobs")
+        f.write_str("SELECT * FROM jobs ")?;
+        f.write_str("FOR UPDATE SKIP LOCKED")
     }
 }
 

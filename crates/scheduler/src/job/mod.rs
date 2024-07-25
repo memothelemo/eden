@@ -1,7 +1,9 @@
 use chrono::Duration;
+use eden_db::schema::JobPriority;
 use eden_utils::Result;
 use futures::future::BoxFuture;
 use std::borrow::Cow;
+use std::fmt::Debug;
 
 mod schedule;
 pub use self::schedule::*;
@@ -21,29 +23,40 @@ pub enum JobStatus {
 
 // We need this trait depend on Deserialize & Serialize so that we can
 // actually process it into the database and do other things later on.
-pub trait Job: Send + Sync + 'static {
+pub trait Job: Debug + Send + Sync + 'static {
     // it must be cloned, preferably wrapped with std::sync::Arc type.
     type State: Clone + Send + Sync + 'static;
 
-    /// A **unique** identifier of the job. It is used to differentiate different
-    /// types of jobs in the database and deserialize and serialize the data given
+    /// A **unique** type of the job. It is used to differentiate different types
+    /// of jobs in the database and deserialize and serialize the data given
     /// per job.
     ///
     /// <b>
-    /// Make sure you configure the unique identifier of the job CORRECT AND FINAL
+    /// Make sure you configure the unique type of the job CORRECT AND FINAL
     /// as any changes to the job identifier will not reflected to the database
     /// (unless manually edited) and might get an unexpected error in logging.
     /// </b>
-    fn id() -> &'static str
+    fn kind() -> &'static str
     where
         Self: Sized;
+
+    /// The priority of which job should go first if the deadline is in
+    /// the similar range with other jobs where [`JobPriority::High`] has
+    /// the highest priority and [`JobPriority::Low`] being the lowest.
+    ///
+    /// It defaults to [`JobPriority::Medium`].
+    fn priority() -> JobPriority
+    where
+        Self: Sized,
+    {
+        JobPriority::Medium
+    }
 
     /// The periodic schedule of a job of when it should be ran.
     ///
     /// If [`JobSchedule::None`] is none, it will be considered as persistent
     /// jobs and should be kept in the database for later use when needed.
     ///
-    /// This function should not
     ///
     /// It defaults to [`JobSchedule::None`].
     fn schedule() -> JobSchedule

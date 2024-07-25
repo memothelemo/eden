@@ -11,19 +11,21 @@ use crate::forms::{
     InsertPaymentForm,
 };
 use crate::payment::{PaymentData, PaymentMethod};
-use crate::schema::{Admin, Bill, Identity, Job, JobData, JobPriority, Payer, Payment};
+use crate::schema::{Admin, Bill, Identity, Job, JobPriority, JobRawData, Payer, Payment};
 
 pub async fn generate_job(conn: &mut sqlx::PgConnection) -> Result<Job> {
     let form = InsertJobForm::builder()
-        .name("foo")
         .deadline(Utc::now())
         .priority(JobPriority::default())
-        .task(serde_json::json!({
-            "currency": "PHP",
-            "deadline": Utc::now(),
-            "payer_id": "613425648685547541",
-            "price": 15.0,
-        }))
+        .data(JobRawData {
+            kind: "foo".into(),
+            data: serde_json::json!({
+                "currency": "PHP",
+                "deadline": Utc::now(),
+                "payer_id": "613425648685547541",
+                "price": 15.0,
+            }),
+        })
         .build();
 
     Job::insert(conn, form).await.anonymize_error()
@@ -166,11 +168,10 @@ pub async fn prepare_sample_jobs(conn: &mut sqlx::PgConnection) -> eden_utils::R
                 conn,
                 InsertJobForm::builder()
                     .deadline($deadline)
-                    .name("foo")
                     .priority(JobPriority::$priority)
-                    .data(JobData {
+                    .data(JobRawData {
                         kind: "foo".into(),
-                        inner: task.clone(),
+                        data: task.clone(),
                     })
                     .build(),
             )

@@ -12,6 +12,7 @@ rust-version = "1.79.0"
 [workspace.dependencies]
 # eden crates
 eden-db = { path = "crates/database" }
+eden-scheduler = { path = "crates/scheduler" }
 eden-utils = { path = "crates/utils" }
 
 # types

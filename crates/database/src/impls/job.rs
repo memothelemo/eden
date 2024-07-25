@@ -1,9 +1,10 @@
+use chrono::{DateTime, Utc};
 use eden_utils::error::AnyResultExt;
 use eden_utils::{error::ResultExt, Result};
 use uuid::Uuid;
 
 use crate::forms::{InsertJobForm, UpdateJobForm};
-use crate::paged_queries::GetAllJobs;
+use crate::paged_queries::{GetAllJobs, PullAllPendingJobs};
 use crate::schema::{Job, JobStatus};
 use crate::utils::Paginated;
 use crate::QueryError;
@@ -39,12 +40,22 @@ impl Job {
     pub fn get_all() -> Paginated<GetAllJobs> {
         Paginated::new(GetAllJobs)
     }
+
+    pub fn pull_all_pending(
+        max_failed_attempts: i64,
+        now: Option<DateTime<Utc>>,
+    ) -> Paginated<PullAllPendingJobs> {
+        Paginated::new(PullAllPendingJobs {
+            max_failed_attempts,
+            now: now.unwrap_or_else(Utc::now),
+        })
+    }
 }
 
 impl Job {
     pub async fn insert(
         conn: &mut sqlx::PgConnection,
-        form: InsertJobForm<'_>,
+        form: InsertJobForm,
     ) -> Result<Self, QueryError> {
         // It has to be serialized before giving it to the database
         let data = serde_json::to_value(&form.data)
@@ -53,11 +64,10 @@ impl Job {
             .attach_printable("could not serialize task to insert job")?;
 
         sqlx::query_as::<_, Job>(
-            r"INSERT INTO jobs (name, deadline, priority, status, data)
-            VALUES ($1, $2, $3, $4, $5)
+            r"INSERT INTO jobs (deadline, priority, status, data)
+            VALUES ($1, $2, $3, $4)
             RETURNING *",
         )
-        .bind(form.name)
         .bind(form.deadline)
         .bind(form.priority)
         .bind(form.status)
@@ -73,6 +83,17 @@ impl Job {
         id: Uuid,
         form: UpdateJobForm,
     ) -> Result<Option<Self>, QueryError> {
+        // sqlx treated serde_json::Value value as jsonb type
+        let data = match form.data {
+            Some(n) => Some(
+                serde_json::to_value(&n)
+                    .anonymize_error()
+                    .transform_context(QueryError)
+                    .attach_printable("could not serialize task to insert job")?,
+            ),
+            None => None,
+        };
+
         sqlx::query_as::<_, Job>(
             r"UPDATE jobs
             SET deadline = COALESCE($1, deadline),
@@ -80,8 +101,9 @@ impl Job {
                 last_retry = COALESCE($3, last_retry),
                 priority = COALESCE($4, priority),
                 status = COALESCE($5, status),
-                data = COALESCE($6, data)
-            WHERE id = $7
+                data = COALESCE($6, data),
+                updated_at = $7
+            WHERE id = $8
             RETURNING *",
         )
         .bind(form.deadline)
@@ -89,8 +111,10 @@ impl Job {
         .bind(form.last_retry)
         .bind(form.priority)
         .bind(form.status)
-        // sqlx treated serde_json::Value value as jsonb type
-        .bind(sqlx::types::Json(form.data))
+        .bind(data)
+        // due to limitations with PullAllQueueJobs query, we have to
+        // bind this argument to update `updated_at` manually.
+        .bind(Utc::now())
         .bind(id)
         .fetch_optional(conn)
         .await
@@ -110,21 +134,20 @@ impl Job {
             .attach_printable("could not delete job from id")
     }
 
-    pub async fn delete_all(conn: &mut sqlx::PgConnection) -> Result<(), QueryError> {
+    pub async fn delete_all(conn: &mut sqlx::PgConnection) -> Result<u64, QueryError> {
         sqlx::query(r"DELETE FROM jobs")
             .execute(conn)
             .await
             .change_context(QueryError)
-            .attach_printable("could not delete all jobs")?;
-
-        Ok(())
+            .attach_printable("could not delete all jobs")
+            .map(|v| v.rows_affected())
     }
 }
 
 #[allow(clippy::unwrap_used, clippy::unreadable_literal)]
 #[cfg(test)]
 mod tests {
-    use crate::schema::{JobPriority, JobStatus};
+    use crate::schema::{JobPriority, JobRawData, JobStatus};
     use crate::test_utils;
 
     use super::*;
@@ -154,29 +177,29 @@ mod tests {
     async fn test_insert(pool: sqlx::PgPool) -> eden_utils::Result<()> {
         let mut conn = pool.acquire().await.anonymize_error()?;
 
-        let name = "clean dump";
         let deadline = Utc::now();
-        let task = serde_json::json!({
-            "currency": "PHP",
-            "deadline": Utc::now(),
-            "payer_id": "613425648685547541",
-            "price": 15.0,
-        });
+        let data = JobRawData {
+            kind: "foo".into(),
+            data: serde_json::json!({
+                "currency": "PHP",
+                "deadline": Utc::now(),
+                "payer_id": "613425648685547541",
+                "price": 15.0,
+            }),
+        };
 
         let form = InsertJobForm::builder()
-            .name("clean dump")
             .deadline(deadline)
             .priority(JobPriority::High)
-            .task(task.clone())
+            .data(data.clone())
             .build();
 
         // milisecond precision lost for this: assert_eq!(job.deadline, deadline);
         let job = Job::insert(&mut conn, form).await.anonymize_error()?;
-        assert_eq!(job.name, name);
         assert_eq!(job.failed_attempts, 0);
         assert_eq!(job.priority, JobPriority::High);
         assert_eq!(job.status, JobStatus::Queued);
-        assert_eq!(serde_json::to_value(job.data.inner).unwrap(), task);
+        assert_eq!(job.data, data);
 
         Ok(())
     }

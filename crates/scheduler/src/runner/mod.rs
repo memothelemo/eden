@@ -1,17 +1,29 @@
-use chrono::{DateTime, TimeDelta, Utc};
 use dashmap::DashMap;
+use eden_utils::error::ResultExt;
 use eden_utils::Result;
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 
+mod catch_unwind;
+mod config;
+mod error;
 mod internal;
-use self::internal::*;
+mod schedule;
 
+use self::error::*;
+use self::internal::*;
 use crate::Job;
 
+pub use self::config::*;
+pub use self::schedule::*;
+
+#[allow(private_interfaces)]
 #[derive(Clone)]
-pub struct JobRunner<S> {
-    registry: Arc<DashMap<&'static str, JobMetadata<S>>>,
+pub struct JobRunner<S = BuilderState>(pub(crate) Arc<JobRunnerInner<S>>);
+
+struct JobRunnerInner<S> {
+    config: JobRunnerConfig,
+    registry: Arc<DashMap<&'static str, JobRegistryMeta<S>>>,
     pool: sqlx::PgPool,
     state: S,
 }
@@ -20,47 +32,49 @@ impl<S> JobRunner<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    #[must_use]
-    pub fn new(pool: sqlx::PgPool, state: S) -> Self {
-        Self {
-            registry: Arc::new(DashMap::new()),
-            pool,
-            state,
-        }
+    pub async fn clear_all(&self) -> Result<u64, ClearAllJobsError> {
+        internal::clear_all_queued_jobs(self).await
     }
 
-    pub fn push<J>(&self, _job: J) -> Result<()>
+    pub async fn push<J>(&self, job: J) -> Result<(), QueueJobError>
     where
         J: Job<State = S> + Serialize,
     {
-        todo!()
+        self.queue_job(&job, None)
+            .await
+            .attach_printable_lazy(|| format!("job.type: {}", J::kind()))
+            .attach_printable_lazy(|| format!("job.data: {job:?}"))
     }
 
-    pub fn schedule<J>(&self, _job: J, _schedule: Schedule) -> Result<()>
+    pub async fn schedule<J>(&self, job: J, schedule: Schedule) -> Result<(), QueueJobError>
     where
         J: Job<State = S> + Serialize,
     {
-        todo!()
+        self.queue_job(&job, Some(schedule))
+            .await
+            .attach_printable_lazy(|| format!("id: {}", J::kind()))
+            .attach_printable_lazy(|| format!("data: {job:?}"))
     }
 
     pub fn register_job<J>(self) -> Self
     where
         J: Job<State = S> + DeserializeOwned,
     {
-        if self.registry.contains_key(J::id()) {
-            panic!("Job {:?} is already registered", J::id());
+        if self.0.registry.contains_key(J::kind()) {
+            panic!("Job {:?} is already registered", J::kind());
         }
 
         let deserializer: DeserializerFn<S> = Box::new(|value| {
             let job: J = serde_json::from_value(value)?;
             Ok(Box::new(job))
         });
-        let metadata: JobMetadata<S> = JobMetadata {
+        let metadata: JobRegistryMeta<S> = JobRegistryMeta {
             deserializer,
+            kind: J::kind(),
             schedule: Box::new(J::schedule),
         };
 
-        self.registry.insert(J::id(), metadata);
+        self.0.registry.insert(J::kind(), metadata);
         self
     }
 }
@@ -69,86 +83,57 @@ impl<S> JobRunner<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    fn serialize_job_task_data() {}
-}
+    async fn queue_job<J>(&self, job: &J, schedule: Option<Schedule>) -> Result<(), QueueJobError>
+    where
+        J: Job<State = S> + Serialize,
+    {
+        // checking if this specified job is registered in the registry
+        if !self.0.registry.contains_key(J::kind()) {
+            return Err(eden_utils::Error::context(
+                eden_utils::ErrorCategory::Unknown,
+                QueueJobError,
+            ))
+            .attach_printable(format!(
+                "job {:?} is not registered in the registry",
+                J::kind()
+            ));
+        }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Schedule {
-    At(DateTime<Utc>),
-    In(TimeDelta),
-}
+        // make sure that job (with schedule is set to None) has a
+        // periodic schedule (retrieved from `J::schedule().is_periodic()`)
+        if schedule.is_none() && !J::schedule().is_periodic() {
+            return Err(eden_utils::Error::context(
+                eden_utils::ErrorCategory::Unknown,
+                QueueJobError,
+            ))
+            .attach_printable(format!(
+                "job {:?} is not periodic, consider putting schedule",
+                J::kind()
+            ));
+        }
 
-impl Schedule {
-    #[must_use]
-    pub const fn now() -> Self {
-        Self::In(TimeDelta::zero())
+        internal::insert_into_queue_db(self, job, schedule)
+            .await
+            .attach_printable("could not queue job into the database")
     }
+}
 
-    #[must_use]
-    pub fn timestamp(&self, now: Option<DateTime<Utc>>) -> DateTime<Utc> {
-        match self {
-            Schedule::At(n) => *n,
-            Schedule::In(delta) => {
-                let now = now.unwrap_or_else(Utc::now);
-                now + *delta
-            }
-        }
+impl<S> std::fmt::Debug for JobRunner<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JobRunner")
+            .field("config", &self.0.config)
+            .field("registered_jobs", &self.0.registry.len())
+            .field("state", &std::any::type_name::<S>())
+            .finish()
     }
 }
 
-macro_rules! delta_fns {
-    ($name:ident, $s_name:literal, $l_name:literal) => {
-        paste::paste! {
-            /// Makes a new [`Scheduled`] with the given number of
-            #[doc = $l_name]
-            ///
-            /// # Panics
-            ///
-            /// Refer to [`
-            #[doc = $s_name]
-            /// `] for panic conditions.
-            #[inline]
-            #[must_use]
-            pub fn [<in_ $name>]($name: i64) -> Self {
-                Self::In(TimeDelta::$name($name))
-            }
-        }
-    };
-    (optional: $name:ident, $s_name:literal, $l_name:literal) => {
-        paste::paste! {
-            /// Makes a new [`Scheduled`] with the given number of
-            #[doc = $l_name]
-            ///
-            /// # Errors
-            ///
-            /// Refer to [`
-            #[doc = $s_name]
-            /// `] for error conditions.
-            #[inline]
-            #[must_use]
-            pub fn [<try_in_ $name>]($name: i64) -> Option<Self> {
-                TimeDelta::[<try_$name>]($name).map(Self::In)
-            }
-        }
-    };
-    { $( ($($tt:tt)*), )* } => {$( delta_fns!($($tt)*); )*};
-}
-
-impl Schedule {
-    delta_fns! {
-        (weeks, "TimeDelta::weeks", "weeks"),
-        (optional: weeks, "TimeDelta::try_weeks", "weeks"),
-
-        (days, "TimeDelta::days", "days"),
-        (optional: days, "TimeDelta::try_days", "days"),
-
-        (hours, "TimeDelta::hours", "hours"),
-        (optional: hours, "TimeDelta::try_hours", "hours"),
-
-        (minutes, "TimeDelta::minutes", "minutes"),
-        (optional: minutes, "TimeDelta::try_minutes", "minutes"),
-
-        (seconds, "TimeDelta::seconds", "seconds"),
-        (optional: seconds, "TimeDelta::try_seconds", "seconds"),
+impl JobRunner<BuilderState> {
+    #[must_use]
+    pub const fn builder() -> JobRunnerConfig {
+        JobRunnerConfig::new()
     }
 }

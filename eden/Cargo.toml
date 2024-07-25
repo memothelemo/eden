@@ -8,8 +8,10 @@ rust-version.workspace = true
 
 [dependencies]
 eden-db.workspace = true
+eden-scheduler.workspace = true
 eden-utils.workspace = true
 
+sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
