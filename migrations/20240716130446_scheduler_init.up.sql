@@ -28,7 +28,7 @@ CREATE TABLE jobs (
     "name" VARCHAR(50) NOT NULL,
     "updated_at" TIMESTAMP,
 
-    "data" JSON NOT NULL,
+    "data" JSONB NOT NULL,
     "deadline" TIMESTAMP NOT NULL,
     "failed_attempts" INTEGER NOT NULL DEFAULT 0,
     "last_retry" TIMESTAMP,
@@ -46,7 +46,7 @@ BEGIN
         RETURN NEW.data;
     END IF;
 
-    IF (json_typeof(NEW.data::json) != 'object') THEN
+    IF (jsonb_typeof(NEW.data::jsonb) != 'object') THEN
         RAISE EXCEPTION '"data" column is not a JSON object';
     END IF;
 
