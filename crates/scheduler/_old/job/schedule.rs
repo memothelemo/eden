@@ -4,13 +4,13 @@ use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum JobSchedule {
-    // If set to the [`Job::schedule`], this job is considered as
+pub enum TaskSchedule {
+    // If set to the [`Task::schedule`], this task is considered as
     // persistent so it should not be pushed into the database.
     None,
     Cron(cron_clock::Schedule),
     Interval(TimeDelta),
-    Multiple(Vec<JobSchedule>),
+    Multiple(Vec<TaskSchedule>),
     #[cfg(test)]
     #[doc(hidden)]
     Timestamp(DateTime<Utc>),
@@ -20,7 +20,7 @@ pub enum JobSchedule {
 #[error("invalid cron expression")]
 pub struct InvalidCronExpr;
 
-impl JobSchedule {
+impl TaskSchedule {
     // #[must_use]
     // pub fn now() -> Self {
     //     Self::Timestamp(Utc::now())
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn should_not_schedule_if_none() {
-        let schedule = JobSchedule::None;
+        let schedule = TaskSchedule::None;
         assert_eq!(schedule.upcoming(None), None);
     }
 
@@ -101,7 +101,7 @@ mod tests {
     fn should_add_delta_if_interval() {
         let now = Utc::now();
         let delta = TimeDelta::seconds(5);
-        let schedule = JobSchedule::Interval(delta);
+        let schedule = TaskSchedule::Interval(delta);
 
         let expected = now + delta;
         assert_eq!(schedule.upcoming(Some(now)), Some(expected));
@@ -111,12 +111,12 @@ mod tests {
     fn should_use_timestamp_if_timestamp() {
         let now = Utc::now();
         let target = now + TimeDelta::days(3);
-        let schedule = JobSchedule::Timestamp(target);
+        let schedule = TaskSchedule::Timestamp(target);
 
         assert_eq!(schedule.upcoming(Some(now)), Some(target));
 
         let target = now - TimeDelta::days(3);
-        let schedule = JobSchedule::Timestamp(target);
+        let schedule = TaskSchedule::Timestamp(target);
         assert_eq!(schedule.upcoming(Some(now)), None);
     }
 
@@ -126,9 +126,9 @@ mod tests {
         let shortest = now + TimeDelta::days(2);
         let longest = now + TimeDelta::days(5);
 
-        let schedule = JobSchedule::Multiple(vec![
-            JobSchedule::Timestamp(shortest),
-            JobSchedule::Timestamp(longest),
+        let schedule = TaskSchedule::Multiple(vec![
+            TaskSchedule::Timestamp(shortest),
+            TaskSchedule::Timestamp(longest),
         ]);
         assert_eq!(schedule.upcoming(Some(now)), Some(shortest));
     }

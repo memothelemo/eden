@@ -1,5 +1,5 @@
 use eden_scheduler::prelude::*;
-use eden_scheduler::{JobRunner, Schedule};
+use eden_scheduler::scheduler::Scheduled;
 use eden_utils::error::ResultExt;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::str::FromStr;
@@ -8,7 +8,7 @@ use std::str::FromStr;
 #[serde(crate = "serde")]
 pub struct CleanupUsers;
 
-impl Job for CleanupUsers {
+impl Task for CleanupUsers {
     type State = ();
 
     fn kind() -> &'static str
@@ -18,18 +18,15 @@ impl Job for CleanupUsers {
         "cleanup-users"
     }
 
-    fn schedule() -> JobSchedule
+    fn schedule() -> TaskSchedule
     where
         Self: Sized,
     {
-        JobSchedule::interval(TimeDelta::seconds(5))
+        TaskSchedule::None
     }
 
-    fn run(&self, _state: Self::State) -> BoxFuture<'_, eden_utils::Result<JobResult>> {
-        Box::pin(async {
-            panic!("Oops!");
-            Ok(JobResult::Completed)
-        })
+    fn perform(&self, _state: Self::State) -> BoxFuture<'_, eden_utils::Result<TaskResult>> {
+        Box::pin(async { Ok(TaskResult::Completed) })
     }
 }
 
@@ -41,18 +38,16 @@ async fn bootstrap() -> eden_utils::Result<()> {
         .await
         .anonymize_error()?;
 
-    let runner = JobRunner::builder()
-        .concurrency(15)
+    let scheduler = eden_scheduler::TaskScheduler::builder()
+        .concurrency(25)
         .build(pool.clone(), ())
-        .register_job::<CleanupUsers>();
+        .register_task::<CleanupUsers>();
 
-    let deleted_jobs = runner.clear_all().await?;
+    let deleted_jobs = scheduler.clear_all().await?;
     println!("deleted {deleted_jobs} jobs");
 
-    runner.schedule(CleanupUsers, Schedule::now()).await?;
-
-    runner.process_queued_jobs().await?;
-    runner.queue_failed_jobs().await?;
+    scheduler.schedule(CleanupUsers, Scheduled::now()).await?;
+    scheduler.queue(CleanupUsers).await?;
 
     Ok(())
 }

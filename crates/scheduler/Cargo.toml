@@ -1,6 +1,6 @@
 [package]
 name = "eden-scheduler"
-description = "A hybrid scheduler handling both ephemeral and persistent background jobs for Eden"
+description = "A hybrid scheduler handling both ephemeral and persistent background tasks for Eden"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

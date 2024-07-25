@@ -1,12 +1,12 @@
-CREATE TYPE job_priority AS ENUM (
+CREATE TYPE task_priority AS ENUM (
     'low', 'medium', 'high'
 );
 
-CREATE TYPE job_status AS ENUM (
+CREATE TYPE task_status AS ENUM (
     'failed', 'running', 'success', 'queued'
 );
 
-CREATE OR REPLACE FUNCTION get_job_priority_level ("value" JOB_PRIORITY)
+CREATE OR REPLACE FUNCTION get_task_priority_level ("value" TASK_PRIORITY)
     RETURNS INTEGER
     AS $$
 BEGIN
@@ -20,7 +20,7 @@ END;
 $$
 LANGUAGE plpgsql;
 
-CREATE TABLE jobs (
+CREATE TABLE tasks (
     "id" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     "created_at" TIMESTAMP WITHOUT TIME ZONE
         NOT NULL
@@ -31,11 +31,11 @@ CREATE TABLE jobs (
     "deadline" TIMESTAMP NOT NULL,
     "failed_attempts" INTEGER NOT NULL DEFAULT 0,
     "last_retry" TIMESTAMP,
-    "priority" JOB_PRIORITY NOT NULL DEFAULT 'medium',
-    "status" JOB_STATUS NOT NULL DEFAULT 'queued'
+    "priority" TASK_PRIORITY NOT NULL DEFAULT 'medium',
+    "status" TASK_STATUS NOT NULL DEFAULT 'queued'
 );
 
-CREATE OR REPLACE FUNCTION check_job_data()
+CREATE OR REPLACE FUNCTION check_task_data()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -57,6 +57,6 @@ END
 $$
 LANGUAGE plpgsql;
 
-CREATE TRIGGER check_job_data
-BEFORE INSERT OR UPDATE ON jobs
-FOR EACH ROW EXECUTE PROCEDURE check_job_data();
+CREATE TRIGGER check_task_data
+BEFORE INSERT OR UPDATE ON tasks
+FOR EACH ROW EXECUTE PROCEDURE check_task_data();

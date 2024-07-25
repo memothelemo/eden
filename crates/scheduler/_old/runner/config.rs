@@ -1,25 +1,25 @@
 use dashmap::DashMap;
 use std::sync::Arc;
 
-use crate::JobRunner;
+use crate::TaskRunner;
 
-use super::JobRunnerInner;
+use super::TaskRunnerInner;
 
 #[derive(Debug, Clone)]
-#[must_use = "JobRunnerConfig is lazy. Use `.build()` to build into JobRunner"]
-pub struct JobRunnerConfig {
+#[must_use = "TaskRunnerConfig is lazy. Use `.build()` to build into TaskRunner"]
+pub struct TaskRunnerConfig {
     pub(crate) concurrency: usize,
     pub(crate) max_failed_attempts: u32,
     pub(crate) poll_interval_secs: u64,
 }
 
-impl Default for JobRunnerConfig {
+impl Default for TaskRunnerConfig {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl JobRunnerConfig {
+impl TaskRunnerConfig {
     pub const fn new() -> Self {
         Self {
             concurrency: 10,
@@ -43,11 +43,11 @@ impl JobRunnerConfig {
         self
     }
 
-    pub fn build<S>(self, pool: sqlx::PgPool, state: S) -> JobRunner<S>
+    pub fn build<S>(self, pool: sqlx::PgPool, state: S) -> TaskRunner<S>
     where
         S: Clone + Send + Sync + 'static,
     {
-        JobRunner(Arc::new(JobRunnerInner {
+        TaskRunner(Arc::new(TaskRunnerInner {
             config: self,
             registry: Arc::new(DashMap::new()),
             pool,

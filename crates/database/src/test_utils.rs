@@ -7,17 +7,17 @@ use twilight_model::id::marker::UserMarker;
 use twilight_model::id::Id;
 
 use crate::forms::{
-    InsertAdminForm, InsertBillForm, InsertIdentityForm, InsertJobForm, InsertPayerForm,
-    InsertPaymentForm,
+    InsertAdminForm, InsertBillForm, InsertIdentityForm, InsertPayerForm, InsertPaymentForm,
+    InsertTaskForm,
 };
 use crate::payment::{PaymentData, PaymentMethod};
-use crate::schema::{Admin, Bill, Identity, Job, JobPriority, JobRawData, Payer, Payment};
+use crate::schema::{Admin, Bill, Identity, Payer, Payment, Task, TaskPriority, TaskRawData};
 
-pub async fn generate_job(conn: &mut sqlx::PgConnection) -> Result<Job> {
-    let form = InsertJobForm::builder()
+pub async fn generate_task(conn: &mut sqlx::PgConnection) -> Result<Task> {
+    let form = InsertTaskForm::builder()
         .deadline(Utc::now())
-        .priority(JobPriority::default())
-        .data(JobRawData {
+        .priority(TaskPriority::default())
+        .data(TaskRawData {
             kind: "foo".into(),
             data: serde_json::json!({
                 "currency": "PHP",
@@ -28,7 +28,7 @@ pub async fn generate_job(conn: &mut sqlx::PgConnection) -> Result<Job> {
         })
         .build();
 
-    Job::insert(conn, form).await.anonymize_error()
+    Task::insert(conn, form).await.anonymize_error()
 }
 
 #[must_use]
@@ -130,7 +130,7 @@ pub async fn generate_bill(conn: &mut sqlx::PgConnection) -> Result<Bill> {
     Bill::insert(conn, form).await.anonymize_error()
 }
 
-pub async fn prepare_sample_jobs(conn: &mut sqlx::PgConnection) -> eden_utils::Result<()> {
+pub async fn prepare_sample_tasks(conn: &mut sqlx::PgConnection) -> eden_utils::Result<()> {
     // prepare 5 sample deadlines
     let deadline_1 = Utc::now();
     let deadline_2 = deadline_1
@@ -149,7 +149,7 @@ pub async fn prepare_sample_jobs(conn: &mut sqlx::PgConnection) -> eden_utils::R
         .checked_add_signed(TimeDelta::milliseconds(500))
         .unwrap();
 
-    // Then prepare these jobs for some reason :)
+    // Then prepare these tasks for some reason :)
     let task = serde_json::json!({
         "currency": "PHP",
         "deadline": Utc::now(),
@@ -157,19 +157,19 @@ pub async fn prepare_sample_jobs(conn: &mut sqlx::PgConnection) -> eden_utils::R
         "price": 15.0,
     });
 
-    // Prepare a list of jobs (situation stuff)
+    // Prepare a list of tasks (situation stuff)
     // - deadline_1 - high priority
     // - deadline_2 - low priority
     // - deadline_1 - medium priority
     // - deadline_3 - high priority and so on
     macro_rules! shorthand_insert {
         ($deadline:ident, $priority:ident) => {{
-            Job::insert(
+            Task::insert(
                 conn,
-                InsertJobForm::builder()
+                InsertTaskForm::builder()
                     .deadline($deadline)
-                    .priority(JobPriority::$priority)
-                    .data(JobRawData {
+                    .priority(TaskPriority::$priority)
+                    .data(TaskRawData {
                         kind: "foo".into(),
                         data: task.clone(),
                     })

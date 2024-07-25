@@ -1,25 +1,25 @@
 use chrono::{DateTime, Utc};
 use typed_builder::TypedBuilder;
 
-use crate::schema::{JobPriority, JobRawData, JobStatus};
+use crate::schema::{TaskPriority, TaskRawData, TaskStatus};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct InsertJobForm {
-    pub data: JobRawData,
+pub struct InsertTaskForm {
+    pub data: TaskRawData,
     pub deadline: DateTime<Utc>,
     #[builder(default)]
-    pub priority: JobPriority,
+    pub priority: TaskPriority,
     #[builder(default)]
-    pub status: JobStatus,
+    pub status: TaskStatus,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
 #[builder(field_defaults(default))]
-pub struct UpdateJobForm {
-    pub data: Option<JobRawData>,
+pub struct UpdateTaskForm {
+    pub data: Option<TaskRawData>,
     pub deadline: Option<DateTime<Utc>>,
     pub failed_attempts: Option<i64>,
     pub last_retry: Option<DateTime<Utc>>,
-    pub priority: Option<JobPriority>,
-    pub status: Option<JobStatus>,
+    pub priority: Option<TaskPriority>,
+    pub status: Option<TaskStatus>,
 }

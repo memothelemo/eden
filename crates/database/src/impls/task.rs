@@ -3,69 +3,69 @@ use eden_utils::error::AnyResultExt;
 use eden_utils::{error::ResultExt, Result};
 use uuid::Uuid;
 
-use crate::forms::{InsertJobForm, UpdateJobForm};
-use crate::paged_queries::{GetAllJobs, PullAllPendingJobs};
-use crate::schema::{Job, JobStatus};
+use crate::forms::{InsertTaskForm, UpdateTaskForm};
+use crate::paged_queries::{GetAllTasks, PullAllPendingTasks};
+use crate::schema::{Task, TaskStatus};
 use crate::utils::Paginated;
 use crate::QueryError;
 
-impl Job {
+impl Task {
     pub async fn fail(conn: &mut sqlx::PgConnection, id: Uuid) -> Result<Self, QueryError> {
         sqlx::query_as::<_, Self>(
-            r"UPDATE jobs
+            r"UPDATE tasks
             SET status = $1,
                 failed_attempts = failed_attempts + 1
             WHERE id = $2
             RETURNING *",
         )
-        .bind(JobStatus::Failed)
+        .bind(TaskStatus::Failed)
         .bind(id)
         .fetch_one(conn)
         .await
         .change_context(QueryError)
-        .attach_printable("could not fail job from id")
+        .attach_printable("could not fail task from id")
     }
 
     pub async fn from_id(
         conn: &mut sqlx::PgConnection,
         id: Uuid,
     ) -> Result<Option<Self>, QueryError> {
-        sqlx::query_as(r"SELECT * FROM jobs WHERE id = $1")
+        sqlx::query_as(r"SELECT * FROM tasks WHERE id = $1")
             .bind(id)
             .fetch_optional(conn)
             .await
             .change_context(QueryError)
-            .attach_printable("could not get job from id")
+            .attach_printable("could not get task from id")
     }
 
-    pub fn get_all() -> GetAllJobs {
-        GetAllJobs::new()
+    pub fn get_all() -> GetAllTasks {
+        GetAllTasks::new()
     }
 
     pub fn pull_all_pending(
         max_failed_attempts: i64,
         now: Option<DateTime<Utc>>,
-    ) -> Paginated<PullAllPendingJobs> {
-        Paginated::new(PullAllPendingJobs {
+    ) -> Paginated<PullAllPendingTasks> {
+        Paginated::new(PullAllPendingTasks {
             max_failed_attempts,
             now: now.unwrap_or_else(Utc::now),
         })
     }
 }
 
-impl Job {
+impl Task {
     pub async fn insert(
         conn: &mut sqlx::PgConnection,
-        form: InsertJobForm,
+        form: InsertTaskForm,
     ) -> Result<Self, QueryError> {
         // It has to be serialized before giving it to the database
         let data = serde_json::to_value(&form.data)
             .anonymize_error()
             .transform_context(QueryError)
-            .attach_printable("could not serialize task to insert job")?;
+            .attach_printable("could not serialize task to insert task")?;
 
-        sqlx::query_as::<_, Job>(
-            r"INSERT INTO jobs (deadline, priority, status, data)
+        sqlx::query_as::<_, Task>(
+            r"INSERT INTO tasks (deadline, priority, status, data)
             VALUES ($1, $2, $3, $4)
             RETURNING *",
         )
@@ -76,13 +76,13 @@ impl Job {
         .fetch_one(conn)
         .await
         .change_context(QueryError)
-        .attach_printable("could not insert job")
+        .attach_printable("could not insert task")
     }
 
     pub async fn update(
         conn: &mut sqlx::PgConnection,
         id: Uuid,
-        form: UpdateJobForm,
+        form: UpdateTaskForm,
     ) -> Result<Option<Self>, QueryError> {
         // sqlx treated serde_json::Value value as jsonb type
         let data = match form.data {
@@ -90,13 +90,13 @@ impl Job {
                 serde_json::to_value(&n)
                     .anonymize_error()
                     .transform_context(QueryError)
-                    .attach_printable("could not serialize task to insert job")?,
+                    .attach_printable("could not serialize task to insert task")?,
             ),
             None => None,
         };
 
-        sqlx::query_as::<_, Job>(
-            r"UPDATE jobs
+        sqlx::query_as::<_, Task>(
+            r"UPDATE tasks
             SET deadline = COALESCE($1, deadline),
                 failed_attempts = COALESCE($2, failed_attempts),
                 last_retry = COALESCE($3, last_retry),
@@ -113,34 +113,34 @@ impl Job {
         .bind(form.priority)
         .bind(form.status)
         .bind(data)
-        // due to limitations with PullAllQueueJobs query, we have to
+        // due to limitations with PullAllQueueTasks query, we have to
         // bind this argument to update `updated_at` manually.
         .bind(Utc::now())
         .bind(id)
         .fetch_optional(conn)
         .await
         .change_context(QueryError)
-        .attach_printable("could not update job from id")
+        .attach_printable("could not update task from id")
     }
 
     pub async fn delete(
         conn: &mut sqlx::PgConnection,
         id: Uuid,
     ) -> Result<Option<Self>, QueryError> {
-        sqlx::query_as::<_, Job>(r"DELETE FROM jobs WHERE id = $1")
+        sqlx::query_as::<_, Task>(r"DELETE FROM tasks WHERE id = $1")
             .bind(id)
             .fetch_optional(conn)
             .await
             .change_context(QueryError)
-            .attach_printable("could not delete job from id")
+            .attach_printable("could not delete task from id")
     }
 
     pub async fn delete_all(conn: &mut sqlx::PgConnection) -> Result<u64, QueryError> {
-        sqlx::query(r"DELETE FROM jobs")
+        sqlx::query(r"DELETE FROM tasks")
             .execute(conn)
             .await
             .change_context(QueryError)
-            .attach_printable("could not delete all jobs")
+            .attach_printable("could not delete all tasks")
             .map(|v| v.rows_affected())
     }
 }
@@ -148,7 +148,7 @@ impl Job {
 #[allow(clippy::unwrap_used, clippy::unreadable_literal)]
 #[cfg(test)]
 mod tests {
-    use crate::schema::{JobPriority, JobRawData, JobStatus};
+    use crate::schema::{TaskPriority, TaskRawData, TaskStatus};
     use crate::test_utils;
 
     use super::*;
@@ -157,16 +157,16 @@ mod tests {
     #[sqlx::test(migrator = "crate::MIGRATOR")]
     async fn test_from_id(pool: sqlx::PgPool) -> eden_utils::Result<()> {
         let mut conn = pool.acquire().await.anonymize_error()?;
-        let job = test_utils::generate_job(&mut conn).await?;
+        let task = test_utils::generate_task(&mut conn).await?;
 
-        assert!(Job::from_id(&mut conn, job.id)
+        assert!(Task::from_id(&mut conn, task.id)
             .await
             .anonymize_error()?
             .is_some());
 
-        Job::delete(&mut conn, job.id).await.anonymize_error()?;
+        Task::delete(&mut conn, task.id).await.anonymize_error()?;
 
-        assert!(Job::from_id(&mut conn, job.id)
+        assert!(Task::from_id(&mut conn, task.id)
             .await
             .anonymize_error()?
             .is_none());
@@ -179,7 +179,7 @@ mod tests {
         let mut conn = pool.acquire().await.anonymize_error()?;
 
         let deadline = Utc::now();
-        let data = JobRawData {
+        let data = TaskRawData {
             kind: "foo".into(),
             data: serde_json::json!({
                 "currency": "PHP",
@@ -189,18 +189,18 @@ mod tests {
             }),
         };
 
-        let form = InsertJobForm::builder()
+        let form = InsertTaskForm::builder()
             .deadline(deadline)
-            .priority(JobPriority::High)
+            .priority(TaskPriority::High)
             .data(data.clone())
             .build();
 
-        // milisecond precision lost for this: assert_eq!(job.deadline, deadline);
-        let job = Job::insert(&mut conn, form).await.anonymize_error()?;
-        assert_eq!(job.failed_attempts, 0);
-        assert_eq!(job.priority, JobPriority::High);
-        assert_eq!(job.status, JobStatus::Queued);
-        assert_eq!(job.data, data);
+        // milisecond precision lost for this: assert_eq!(task.deadline, deadline);
+        let task = Task::insert(&mut conn, form).await.anonymize_error()?;
+        assert_eq!(task.failed_attempts, 0);
+        assert_eq!(task.priority, TaskPriority::High);
+        assert_eq!(task.status, TaskStatus::Queued);
+        assert_eq!(task.data, data);
 
         Ok(())
     }
@@ -208,17 +208,17 @@ mod tests {
     #[sqlx::test(migrator = "crate::MIGRATOR")]
     async fn test_update(pool: sqlx::PgPool) -> eden_utils::Result<()> {
         let mut conn = pool.acquire().await.anonymize_error()?;
-        let job = test_utils::generate_job(&mut conn).await?;
+        let task = test_utils::generate_task(&mut conn).await?;
 
         let new_deadline = Utc::now();
-        let form = UpdateJobForm::builder()
+        let form = UpdateTaskForm::builder()
             .deadline(Some(new_deadline))
             .failed_attempts(Some(2))
-            .priority(Some(JobPriority::Low))
-            .status(Some(JobStatus::Failed))
+            .priority(Some(TaskPriority::Low))
+            .status(Some(TaskStatus::Failed))
             .build();
 
-        let new_data = Job::update(&mut conn, job.id, form)
+        let new_data = Task::update(&mut conn, task.id, form)
             .await
             .anonymize_error()?;
 
@@ -228,8 +228,8 @@ mod tests {
         let new_data = new_data.unwrap();
         assert!(new_data.updated_at.is_some());
         assert_eq!(new_data.failed_attempts, 2);
-        assert_eq!(new_data.priority, JobPriority::Low);
-        assert_eq!(new_data.status, JobStatus::Failed);
+        assert_eq!(new_data.priority, TaskPriority::Low);
+        assert_eq!(new_data.status, TaskStatus::Failed);
 
         Ok(())
     }
@@ -237,16 +237,16 @@ mod tests {
     #[sqlx::test(migrator = "crate::MIGRATOR")]
     async fn test_delete(pool: sqlx::PgPool) -> eden_utils::Result<()> {
         let mut conn = pool.acquire().await.anonymize_error()?;
-        let job = test_utils::generate_job(&mut conn).await?;
+        let task = test_utils::generate_task(&mut conn).await?;
 
-        assert!(Job::from_id(&mut conn, job.id)
+        assert!(Task::from_id(&mut conn, task.id)
             .await
             .anonymize_error()?
             .is_some());
 
-        Job::delete(&mut conn, job.id).await.anonymize_error()?;
+        Task::delete(&mut conn, task.id).await.anonymize_error()?;
 
-        assert!(Job::from_id(&mut conn, job.id)
+        assert!(Task::from_id(&mut conn, task.id)
             .await
             .anonymize_error()?
             .is_none());
