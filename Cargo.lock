@@ -448,7 +448,6 @@ name = "eden"
 version = "0.1.0-alpha.0"
 dependencies = [
  "eden-db",
- "eden-scheduler",
  "eden-utils",
  "sqlx",
  "thiserror",
