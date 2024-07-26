@@ -23,7 +23,8 @@ pub struct Task {
 pub struct TaskRawData {
     #[serde(rename = "type")]
     pub kind: String,
-    pub data: Json,
+    #[serde(rename = "data")]
+    pub inner: Json,
 }
 
 impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Task {

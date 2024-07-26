@@ -1,42 +1,58 @@
-// use eden_scheduler::prelude::*;
-// use eden_scheduler::scheduler::Scheduled;
+use eden_tasks::prelude::*;
 use eden_utils::error::ResultExt;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::str::FromStr;
 
-// #[derive(Debug, Deserialize, Serialize)]
-// #[serde(crate = "serde")]
-// pub struct CleanupUsers;
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(crate = "serde")]
+pub struct CleanupUsers;
 
-// impl Task for CleanupUsers {
-//     type State = ();
+impl Task for CleanupUsers {
+    type State = ();
 
-//     fn kind() -> &'static str
-//     where
-//         Self: Sized,
-//     {
-//         "cleanup-users"
-//     }
+    fn task_type() -> &'static str
+    where
+        Self: Sized,
+    {
+        "cleanup-users"
+    }
 
-//     fn schedule() -> TaskSchedule
-//     where
-//         Self: Sized,
-//     {
-//         TaskSchedule::None
-//     }
+    fn schedule() -> TaskSchedule
+    where
+        Self: Sized,
+    {
+        TaskSchedule::interval(TimeDelta::seconds(1))
+    }
 
-//     fn perform(&self, _state: Self::State) -> BoxFuture<'_, eden_utils::Result<TaskResult>> {
-//         Box::pin(async { Ok(TaskResult::Completed) })
-//     }
-// }
+    fn perform(
+        &self,
+        _info: &TaskPerformInfo,
+        _state: Self::State,
+    ) -> BoxFuture<'_, eden_utils::Result<TaskResult>> {
+        let file = std::fs::read("foo").anonymize_error().unwrap_err();
+        Box::pin(async { Ok(TaskResult::Completed) })
+    }
+}
 
 #[allow(clippy::unnecessary_wraps, clippy::unwrap_used)]
 async fn bootstrap() -> eden_utils::Result<()> {
     let db_url = eden_utils::env::var("DATABASE_URL")?;
-    let _pool = PgPoolOptions::new()
+    let pool = PgPoolOptions::new()
         .connect_with(PgConnectOptions::from_str(&db_url).anonymize_error()?)
         .await
         .anonymize_error()?;
+
+    let queue = eden_tasks::Queue::builder()
+        .concurrency(25)
+        .poll_interval(TimeDelta::seconds(1))
+        .build(pool.clone(), ())
+        .register_task::<CleanupUsers>();
+
+    queue.start().await?;
+    // queue.schedule(task, Scheduled::now()).await?;
+
+    tokio::signal::ctrl_c().await.anonymize_error()?;
+    queue.shutdown().await;
 
     // let scheduler = eden_scheduler::TaskScheduler::builder()
     //     .concurrency(25)

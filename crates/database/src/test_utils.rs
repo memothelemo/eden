@@ -19,7 +19,7 @@ pub async fn generate_task(conn: &mut sqlx::PgConnection) -> Result<Task> {
         .priority(TaskPriority::default())
         .data(TaskRawData {
             kind: "foo".into(),
-            data: serde_json::json!({
+            inner: serde_json::json!({
                 "currency": "PHP",
                 "deadline": Utc::now(),
                 "payer_id": "613425648685547541",
@@ -163,15 +163,15 @@ pub async fn prepare_sample_tasks(conn: &mut sqlx::PgConnection) -> eden_utils::
     // - deadline_1 - medium priority
     // - deadline_3 - high priority and so on
     macro_rules! shorthand_insert {
-        ($deadline:ident, $priority:ident) => {{
+        ($deadline:ident, $priority:ident, $kind:literal) => {{
             Task::insert(
                 conn,
                 InsertTaskForm::builder()
                     .deadline($deadline)
                     .priority(TaskPriority::$priority)
                     .data(TaskRawData {
-                        kind: "foo".into(),
-                        data: task.clone(),
+                        kind: $kind.into(),
+                        inner: task.clone(),
                     })
                     .build(),
             )
@@ -180,21 +180,21 @@ pub async fn prepare_sample_tasks(conn: &mut sqlx::PgConnection) -> eden_utils::
         }};
     }
 
-    shorthand_insert!(deadline_1, High);
-    shorthand_insert!(deadline_3, Low);
-    shorthand_insert!(deadline_4, High);
-    shorthand_insert!(deadline_1, Low);
-    shorthand_insert!(deadline_5, High);
-    shorthand_insert!(deadline_2, Low);
-    shorthand_insert!(deadline_5, Medium);
-    shorthand_insert!(deadline_1, Medium);
-    shorthand_insert!(deadline_3, High);
-    shorthand_insert!(deadline_5, Low);
-    shorthand_insert!(deadline_2, High);
-    shorthand_insert!(deadline_4, Medium);
-    shorthand_insert!(deadline_2, Medium);
-    shorthand_insert!(deadline_3, Medium);
-    shorthand_insert!(deadline_4, Low);
+    shorthand_insert!(deadline_1, High, "organ");
+    shorthand_insert!(deadline_3, Low, "organ");
+    shorthand_insert!(deadline_4, High, "organ");
+    shorthand_insert!(deadline_1, Low, "organ");
+    shorthand_insert!(deadline_5, High, "organ");
+    shorthand_insert!(deadline_2, Low, "organ");
+    shorthand_insert!(deadline_5, Medium, "organ");
+    shorthand_insert!(deadline_1, Medium, "organ");
+    shorthand_insert!(deadline_3, High, "foo");
+    shorthand_insert!(deadline_5, Low, "foo");
+    shorthand_insert!(deadline_2, High, "foo");
+    shorthand_insert!(deadline_4, Medium, "foo");
+    shorthand_insert!(deadline_2, Medium, "foo");
+    shorthand_insert!(deadline_3, Medium, "foo");
+    shorthand_insert!(deadline_4, Low, "foo");
 
     Ok(())
 }

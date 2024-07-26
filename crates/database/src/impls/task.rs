@@ -38,7 +38,7 @@ impl Task {
             .attach_printable("could not get task from id")
     }
 
-    pub fn get_all() -> GetAllTasks {
+    pub fn get_all<'a>() -> GetAllTasks<'a> {
         GetAllTasks::new()
     }
 
@@ -143,6 +143,19 @@ impl Task {
             .attach_printable("could not delete all tasks")
             .map(|v| v.rows_affected())
     }
+
+    pub async fn delete_all_with_status(
+        conn: &mut sqlx::PgConnection,
+        status: TaskStatus,
+    ) -> Result<u64, QueryError> {
+        sqlx::query(r"DELETE FROM tasks WHERE status = $1")
+            .bind(status)
+            .execute(conn)
+            .await
+            .change_context(QueryError)
+            .attach_printable_lazy(|| format!("could not delete all tasks with status {status:?}"))
+            .map(|v| v.rows_affected())
+    }
 }
 
 #[allow(clippy::unwrap_used, clippy::unreadable_literal)]
@@ -181,7 +194,7 @@ mod tests {
         let deadline = Utc::now();
         let data = TaskRawData {
             kind: "foo".into(),
-            data: serde_json::json!({
+            inner: serde_json::json!({
                 "currency": "PHP",
                 "deadline": Utc::now(),
                 "payer_id": "613425648685547541",

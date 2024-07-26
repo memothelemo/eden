@@ -5,17 +5,26 @@ use crate::schema::{Task, TaskStatus};
 use crate::utils::{PagedQuery, Paginated};
 
 #[must_use]
-pub struct GetAllTasks {
+pub struct GetAllTasks<'a> {
     status: Option<TaskStatus>,
+    task_type: Option<&'a str>,
 }
 
-impl GetAllTasks {
+impl<'a> GetAllTasks<'a> {
     pub fn new() -> Self {
-        Self { status: None }
+        Self {
+            status: None,
+            task_type: None,
+        }
     }
 
     pub fn status(mut self, status: TaskStatus) -> Self {
         self.status = Some(status);
+        self
+    }
+
+    pub fn task_type(mut self, task_type: &'a str) -> Self {
+        self.task_type = Some(task_type);
         self
     }
 
@@ -24,7 +33,7 @@ impl GetAllTasks {
     }
 }
 
-impl PagedQuery for GetAllTasks {
+impl<'a> PagedQuery for GetAllTasks<'a> {
     type Output = Task;
 
     fn build_args(&self) -> PgArguments {
@@ -32,13 +41,27 @@ impl PagedQuery for GetAllTasks {
         if let Some(status) = self.status.as_ref() {
             args.add(status);
         }
+        if let Some(task_type) = self.task_type.as_ref() {
+            args.add(task_type);
+        }
         args
     }
 
     fn build_sql(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("SELECT * FROM tasks ")?;
+
+        let mut count = 0;
         if self.status.is_some() {
-            f.write_str("WHERE status = $1 ")?;
+            write!(f, "WHERE ")?;
+            count += 1;
+            write!(f, "status = ${count} ")?;
+        }
+        if self.task_type.is_some() {
+            if count == 0 {
+                write!(f, "WHERE ")?;
+            }
+            count += 1;
+            write!(f, "data->>'type' = ${count} ")?;
         }
         f.write_str("FOR UPDATE SKIP LOCKED")
     }
@@ -50,6 +73,19 @@ mod tests {
     use eden_utils::error::ResultExt;
 
     use super::*;
+
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn test_task_type(pool: sqlx::PgPool) -> eden_utils::Result<()> {
+        let mut conn = pool.acquire().await.anonymize_error()?;
+        test_utils::prepare_sample_tasks(&mut conn).await?;
+
+        let mut stream = Paginated::new(GetAllTasks::new().task_type("foo")).size(3);
+        while let Some(data) = stream.next(&mut conn).await.anonymize_error()? {
+            assert!(data.iter().all(|v| v.data.kind == "foo"));
+        }
+
+        Ok(())
+    }
 
     #[sqlx::test(migrator = "crate::MIGRATOR")]
     async fn test_pagination(pool: sqlx::PgPool) -> eden_utils::Result<()> {

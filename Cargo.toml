@@ -12,6 +12,7 @@ rust-version = "1.79.0"
 [workspace.dependencies]
 # eden crates
 eden-db = { path = "crates/database" }
+eden-tasks = { path = "crates/tasks" }
 eden-utils = { path = "crates/utils" }
 
 # types
@@ -25,6 +26,7 @@ uuid = { version = "1.10.0", features = ["serde", "v4"] }
 error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "f52d870" }
 
 # macros
+paste = "*"
 thiserror = "1.0.61"
 
 # user configuration

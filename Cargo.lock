@@ -448,6 +448,7 @@ name = "eden"
 version = "0.1.0-alpha.0"
 dependencies = [
  "eden-db",
+ "eden-tasks",
  "eden-utils",
  "sqlx",
  "thiserror",
@@ -484,7 +485,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eden-scheduler"
+name = "eden-tasks"
 version = "0.1.0-alpha.0"
 dependencies = [
  "chrono",
@@ -500,6 +501,7 @@ dependencies = [
  "static_assertions",
  "thiserror",
  "tokio",
+ "tokio-util",
  "uuid",
 ]
 
@@ -2290,8 +2292,12 @@ checksum = "9cf6b47b3771c49ac75ad09a6162f53ad4b8088b76ac60e8ec1455b31a189fe1"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
+ "futures-util",
+ "hashbrown 0.14.5",
  "pin-project-lite",
+ "slab",
  "tokio",
 ]
 
