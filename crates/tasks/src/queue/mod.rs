@@ -61,14 +61,7 @@ where
             .attach_printable("could not commit database transaction")?;
 
         // clear all blocked tasks if necessary and not running
-        for mut entry in self.0.blocked_periodic_tasks.iter_mut() {
-            match entry.value_mut() {
-                value @ BlockedReason::Queued => {
-                    *value = BlockedReason::None;
-                }
-                _ => {}
-            }
-        }
+        todo!("unblock all periodic tasks");
 
         Ok(deleted)
     }
@@ -212,100 +205,6 @@ where
             .attach_printable("unable to start transaction from the database")
     }
 
-    fn unblock_periodic_task(&self, task_type: &'static str) {
-        self.0.blocked_periodic_tasks.remove(&task_type);
-    }
-
-    fn block_periodic_task(&self, task_type: &'static str, reason: BlockedReason) {
-        self.0.blocked_periodic_tasks.insert(&task_type, reason);
-    }
-
-    fn is_periodic_task_blocked(&self, task_type: &str) -> bool {
-        if let Some(data) = self.0.blocked_periodic_tasks.get_mut(task_type) {
-            // manually remove that task to the table
-            if matches!(data.value(), BlockedReason::None) {
-                drop(data);
-                return false;
-            }
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Performs a task. That's all..
-    async fn perform_task(
-        &self,
-        perform_info: TaskPerformInfo,
-        raw_data: TaskRawData,
-        registry_meta: &TaskRegistryMeta<S>,
-    ) -> Result<(), PerformTaskError> {
-        let is_periodic = registry_meta.is_periodic;
-        let is_retrying = perform_info.is_retrying;
-
-        let deserializer = &*registry_meta.deserializer;
-        let task = deserializer(raw_data.inner)
-            .map_err(|e| Error::any(ErrorCategory::Unknown, e))
-            .transform_context(PerformTaskError)
-            .attach_printable_lazy(|| {
-                format!("could not deserialize task for {:?}", registry_meta.kind)
-            })?;
-
-        println!(
-            "running task {} with type {:?}; data = {task:?}",
-            perform_info.id, registry_meta.kind
-        );
-
-        let task_future = task.perform(&perform_info, self.0.state.clone()).boxed();
-        let task_future = CatchUnwindTaskFuture::new(task_future);
-
-        let timeout = task
-            .timeout()
-            .to_std()
-            .change_context(PerformTaskError)
-            .attach_printable_lazy(|| {
-                format!("could not get task timeout for {:?}", registry_meta.kind)
-            })?;
-
-        let now = std::time::Instant::now();
-        let result = tokio::time::timeout(timeout, task_future)
-            .await
-            .change_context(PerformTaskError)
-            .map_err(|e| e.attach(self::error_tags::TaskTimedOut))
-            .flatten();
-
-        let elapsed = now.elapsed();
-        match result {
-            Ok(TaskResult::Completed) => {
-                println!(
-                    "task {} with type {:?}; task completed (took {elapsed:?})",
-                    perform_info.id, registry_meta.kind
-                );
-            }
-            Ok(TaskResult::Fail(msg)) => {
-                println!(
-                    "task {} with type {:?}; task failed: {msg} (took {elapsed:?})",
-                    perform_info.id, registry_meta.kind
-                );
-            }
-            Ok(TaskResult::RetryIn(at)) => {
-                println!(
-                    "task {} with type {:?}; task requested retry = {at:?} (took {elapsed:?})",
-                    perform_info.id, registry_meta.kind
-                );
-            }
-            Err(error) => {
-                let error = error.anonymize();
-                println!(
-                    "task {} with type {:?}; task failed: {error}",
-                    perform_info.id, registry_meta.kind,
-                );
-            }
-        }
-
-        Ok(())
-    }
-
     /// Unsafe version of [`Queue::schedule`] but any registered task
     /// (periodic or persistent) can be scheduled.
     async fn queue(
@@ -328,9 +227,7 @@ where
         let deadline = scheduled.timestamp(now);
         let priority = (&*registry_meta.priority)();
         if registry_meta.is_periodic {
-            self.0
-                .blocked_periodic_tasks
-                .insert(registry_meta.kind, BlockedReason::Queued);
+            todo!()
         }
 
         let form = InsertTaskForm::builder()
@@ -380,17 +277,9 @@ where
     }
 }
 
-#[derive(Debug)]
-enum BlockedReason {
-    Running,
-    Queued,
-    None,
-}
-
 struct QueueInner<S> {
     // periodic tasks that are blocked from running (maybe it is already running
     // or being scheduled from the database because of an error)
-    blocked_periodic_tasks: Arc<DashMap<&'static str, BlockedReason>>,
     config: QueueConfig,
     pool: sqlx::PgPool,
     registry: Arc<DashMap<&'static str, TaskRegistryMeta<S>>>,

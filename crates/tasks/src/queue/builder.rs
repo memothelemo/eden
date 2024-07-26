@@ -18,7 +18,6 @@ impl QueueConfig {
         S: Clone + Send + Sync + 'static,
     {
         Queue(Arc::new(QueueInner {
-            blocked_periodic_tasks: Arc::new(DashMap::new()),
             config: self,
             pool,
             registry: Arc::new(DashMap::new()),

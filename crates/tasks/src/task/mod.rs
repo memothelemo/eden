@@ -1,7 +1,6 @@
 use chrono::{DateTime, TimeDelta, Utc};
 use eden_utils::Result;
 use futures::future::BoxFuture;
-use std::borrow::Cow;
 use std::fmt::Debug;
 use uuid::Uuid;
 

@@ -1,56 +1,54 @@
 use chrono::{DateTime, Utc};
-use eden_db::schema::TaskRawData;
 use std::future::Future;
-use uuid::Uuid;
 
-use super::{BlockedReason, Queue};
-use crate::TaskPerformInfo;
+use super::Queue;
 
 impl<S> Queue<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    fn run_periodic_tasks(&self, now: DateTime<Utc>) {
-        let periodic_tasks = self.0.registry.iter().filter(|v| v.is_periodic);
-        for task in periodic_tasks {
-            // Do not try to run if it is blocked
-            if self.is_periodic_task_blocked(&task.kind) {
-                continue;
-            }
+    fn run_periodic_tasks(&self, _now: DateTime<Utc>) {
+        // let periodic_tasks = self.0.registry.iter().filter(|v| v.is_periodic);
+        // for task in periodic_tasks {
+        //     // Do not try to run if it is blocked
+        //     if self.is_periodic_task_blocked(&task.kind) {
+        //         continue;
+        //     }
 
-            let queue_tx = self.clone();
-            let kind = task.kind;
-            self.spawn_fut(async move {
-                let Some(task) = queue_tx.0.registry.get(kind) else {
-                    return;
-                };
+        //     let queue_tx = self.clone();
+        //     let kind = task.kind;
+        //     self.spawn_fut(async move {
+        //         let Some(task) = queue_tx.0.registry.get(kind) else {
+        //             return;
+        //         };
 
-                // Generate a fake JobRawData object so that a periodic task
-                // can be deserialized unless if it has something wrong with the
-                // user configuration and stuff...
-                let fake_task_id = Uuid::new_v4();
-                let perform_info = TaskPerformInfo {
-                    id: fake_task_id,
-                    created_at: now,
-                    failed_attempts: 0,
-                    last_retry: None,
-                    is_retrying: false,
-                };
-                let raw_data = TaskRawData {
-                    kind: task.kind.into(),
-                    inner: serde_json::Value::Null,
-                };
+        //         // Generate a fake JobRawData object so that a periodic task
+        //         // can be deserialized unless if it has something wrong with the
+        //         // user configuration and stuff...
+        //         let fake_task_id = Uuid::new_v4();
+        //         let perform_info = TaskPerformInfo {
+        //             id: fake_task_id,
+        //             created_at: now,
+        //             failed_attempts: 0,
+        //             last_retry: None,
+        //             is_retrying: false,
+        //         };
+        //         let raw_data = TaskRawData {
+        //             kind: task.kind.into(),
+        //             inner: serde_json::Value::Null,
+        //         };
 
-                queue_tx.block_periodic_task(task.kind, BlockedReason::Running);
-                if let Err(error) = queue_tx.perform_task(perform_info, raw_data, &task).await {
-                    let error = error.anonymize();
-                    eprintln!("task {fake_task_id} with type {kind:?}; task failed: {error}",);
-                }
-                queue_tx.unblock_periodic_task(task.kind);
-            });
-        }
+        //         queue_tx.block_periodic_task(task.kind, BlockedReason::Running);
+        //         if let Err(error) = queue_tx.perform_task(perform_info, raw_data, &task).await {
+        //             let error = error.anonymize();
+        //             eprintln!("task {fake_task_id} with type {kind:?}; task failed: {error}",);
+        //         }
+        //         queue_tx.unblock_periodic_task(task.kind);
+        //     });
+        // }
     }
 
+    #[allow(unused)]
     fn spawn_fut<F>(&self, task: F)
     where
         F: Future + Send + 'static,
