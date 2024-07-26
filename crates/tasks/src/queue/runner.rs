@@ -7,6 +7,7 @@ impl<S> Queue<S>
 where
     S: Clone + Send + Sync + 'static,
 {
+    #[allow(clippy::unused_self)]
     fn run_periodic_tasks(&self, _now: DateTime<Utc>) {
         // let periodic_tasks = self.0.registry.iter().filter(|v| v.is_periodic);
         // for task in periodic_tasks {
@@ -78,8 +79,8 @@ where
         let shutdown = queue.0.shutdown.cancelled();
 
         tokio::select! {
-            _ = poll => {},
-            _ = shutdown => {
+            () = poll => {},
+            () = shutdown => {
                 eprintln!("requested shutdown");
                 return;
             },

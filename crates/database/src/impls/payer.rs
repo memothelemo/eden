@@ -188,9 +188,9 @@ mod tests {
 
         let form = InsertPayerForm::builder()
             .id(id)
-            .name(&name)
-            .java_username(&java_username)
-            .bedrock_username(Some(&bedrock_username))
+            .name(name)
+            .java_username(java_username)
+            .bedrock_username(Some(bedrock_username))
             .build();
 
         let payer = Payer::insert(&mut conn, form).await.anonymize_error()?;
@@ -207,7 +207,7 @@ mod tests {
         assert_eq!(java_identity.name, Some(java_username.into()));
         assert_eq!(java_identity.uuid, None);
 
-        let bedrock_identity = identities.get(0).unwrap();
+        let bedrock_identity = identities.first().unwrap();
         assert_eq!(bedrock_identity.name, Some(bedrock_username.into()));
         assert_eq!(bedrock_identity.uuid, None);
 
@@ -226,8 +226,8 @@ mod tests {
 
         let form = InsertPayerForm::builder()
             .id(id)
-            .name(&name)
-            .java_username(&java_username)
+            .name(name)
+            .java_username(java_username)
             .build();
 
         let payer = Payer::insert(&mut conn, form).await.anonymize_error()?;
@@ -244,7 +244,7 @@ mod tests {
         assert_eq!(java_identity.name, Some(java_username.into()));
         assert_eq!(java_identity.uuid, None);
 
-        let bedrock_identity = identities.get(0).unwrap();
+        let bedrock_identity = identities.first().unwrap();
         assert_eq!(bedrock_identity.name, Some(bedrock_username.into()));
         assert_eq!(bedrock_identity.uuid, None);
 

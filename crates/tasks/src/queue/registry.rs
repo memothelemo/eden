@@ -38,9 +38,11 @@ where
     where
         T: Task<State = S> + DeserializeOwned,
     {
-        if self.is_task_registered::<T>() {
-            panic!("Task {:?} is already registered", T::task_type());
-        }
+        assert!(
+            !self.is_task_registered::<T>(),
+            "Task {:?} is already registered",
+            T::task_type()
+        );
 
         let deserializer: DeserializerFn<S> = Box::new(|value| {
             let task: T = serde_json::from_value(value)?;

@@ -74,7 +74,7 @@ pub async fn generate_identity(
 ) -> Result<Identity> {
     let form = InsertIdentityForm::builder()
         .payer_id(payer_id)
-        .name(Some("dummy".into()))
+        .name(Some("dummy"))
         .uuid(None)
         .build();
 
@@ -88,7 +88,7 @@ pub async fn generate_identity_with_name(
 ) -> Result<Identity> {
     let form = InsertIdentityForm::builder()
         .payer_id(payer_id)
-        .name(Some(name.into()))
+        .name(Some(name))
         .uuid(None)
         .build();
 

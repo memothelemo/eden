@@ -3,5 +3,5 @@
         "editor.formatOnSave": true
     },
     "evenBetterToml.schema.enabled": true,
-    "rust-analyzer.check.command": "check"
+    "rust-analyzer.check.command": "clippy"
 }

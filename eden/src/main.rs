@@ -24,6 +24,7 @@ impl Task for CleanupUsers {
         TaskSchedule::interval(TimeDelta::seconds(1))
     }
 
+    #[allow(clippy::unwrap_used)]
     fn perform(
         &self,
         _info: &TaskPerformInfo,

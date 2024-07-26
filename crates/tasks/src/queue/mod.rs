@@ -2,9 +2,8 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use eden_db::forms::InsertTaskForm;
 use eden_db::schema::{Task, TaskRawData, TaskStatus};
-use eden_utils::error::{AnyResultExt, ErrorExt, ResultExt};
+use eden_utils::error::{AnyResultExt, ResultExt};
 use eden_utils::{Error, ErrorCategory, Result};
-use futures::FutureExt;
 use serde::Serialize;
 use sqlx::{pool::PoolConnection, Transaction};
 use std::sync::Arc;
@@ -21,11 +20,10 @@ mod error_tags;
 mod registry;
 mod runner;
 
-use crate::{error::*, Task as AnyTask, TaskResult};
-use crate::{Scheduled, TaskPerformInfo};
+use crate::Scheduled;
+use crate::{error::*, Task as AnyTask};
 
 use self::builder::BuilderState;
-use self::catch_unwind::CatchUnwindTaskFuture;
 use self::registry::TaskRegistryMeta;
 
 pub use self::config::*;
@@ -151,6 +149,7 @@ where
 
     /// Attempts to shut down the queue runner and waits for all running tasks
     /// to be terminated regardless of their result.
+    #[allow(clippy::let_underscore_must_use)]
     pub async fn shutdown(&self) {
         self.0.shutdown.cancel();
         self.0.running_tasks.close();
@@ -183,7 +182,7 @@ where
 {
     /// Tries to establish database connection
     ///
-    /// Refer to [sqlx's PoolConnection object](PoolConnection) for more documentation
+    /// Refer to [sqlx's `PoolConnection` object](PoolConnection) for more documentation
     /// and how it should be used.
     pub async fn db_connection(&self) -> Result<PoolConnection<sqlx::Postgres>> {
         let pool = &self.0.pool;
@@ -225,7 +224,7 @@ where
         // Block this task from running it locally regardless if it reaches the deadline
         // (if it is a periodic task)
         let deadline = scheduled.timestamp(now);
-        let priority = (&*registry_meta.priority)();
+        let priority = (*registry_meta.priority)();
         if registry_meta.is_periodic {
             todo!()
         }
@@ -249,6 +248,7 @@ where
         Ok(queued_task.id)
     }
 
+    #[allow(clippy::unused_self)]
     fn serialize_task<T>(&self, task: &T) -> Result<TaskRawData, ScheduleTaskError>
     where
         T: AnyTask<State = S> + Serialize,

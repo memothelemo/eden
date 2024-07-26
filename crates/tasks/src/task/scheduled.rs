@@ -27,7 +27,7 @@ impl Scheduled {
     pub fn is_now(&self) -> bool {
         match self {
             Self::In(n) => n.is_zero(),
-            _ => false,
+            Self::At(..) => false,
         }
     }
 }

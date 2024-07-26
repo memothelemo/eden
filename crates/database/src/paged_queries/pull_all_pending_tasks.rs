@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use eden_utils::error::ResultExt;
 use eden_utils::Result;
-use futures::Future;
 use sqlx::postgres::PgArguments;
 use sqlx::Arguments;
 
@@ -34,33 +33,29 @@ impl PagedQuery for PullAllPendingTasks {
         write!(f, "FOR UPDATE SKIP LOCKED")
     }
 
-    fn prerun(
-        &self,
-        conn: &mut sqlx::PgConnection,
-    ) -> impl Future<Output = Result<(), QueryError>> + Send {
+    async fn prerun(&self, conn: &mut sqlx::PgConnection) -> Result<(), QueryError> {
         // this is to better differentiate which tasks are updated now
-        async {
-            sqlx::query(
-                r"UPDATE tasks SET status = $1, updated_at = $3,
+        sqlx::query(
+            r"UPDATE tasks SET status = $1, updated_at = $3,
                 last_retry = CASE WHEN failed_attempts > 0
                     THEN $3
                     ELSE last_retry
                 END
                 WHERE failed_attempts < $2 AND deadline <= $3",
-            )
-            .bind(TaskStatus::Running)
-            .bind(self.max_failed_attempts)
-            .bind(self.now)
-            .execute(conn)
-            .await
-            .change_context(QueryError)
-            .attach_printable("could not pull queued tasks")?;
+        )
+        .bind(TaskStatus::Running)
+        .bind(self.max_failed_attempts)
+        .bind(self.now)
+        .execute(conn)
+        .await
+        .change_context(QueryError)
+        .attach_printable("could not pull queued tasks")?;
 
-            Ok(())
-        }
+        Ok(())
     }
 }
 
+#[allow(clippy::unwrap_used, clippy::unreadable_literal)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,7 +80,7 @@ mod tests {
             assert!(tasks.iter().all(|v| v.deadline == deadline));
 
             // it must be sorted from high to low
-            assert_eq!(tasks.get(0).unwrap().priority, TaskPriority::High);
+            assert_eq!(tasks.first().unwrap().priority, TaskPriority::High);
             assert_eq!(tasks.get(1).unwrap().priority, TaskPriority::Medium);
             assert_eq!(tasks.get(2).unwrap().priority, TaskPriority::Low);
 
@@ -98,7 +93,7 @@ mod tests {
             assert!(n[0] < n[1]);
         }
 
-        assert!(deadline_order_test.len() > 0);
+        assert!(!deadline_order_test.is_empty());
         Ok(())
     }
 }

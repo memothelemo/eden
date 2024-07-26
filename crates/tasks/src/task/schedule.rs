@@ -31,7 +31,7 @@ impl TaskSchedule {
     pub fn is_periodic(&self) -> bool {
         match self {
             Self::Interval(..) | Self::Cron(..) => true,
-            Self::Multiple(schedules) => schedules.iter().any(|v| v.is_periodic()),
+            Self::Multiple(schedules) => schedules.iter().any(TaskSchedule::is_periodic),
             Self::Once => false,
             #[cfg(test)]
             Self::Timestamp(..) => false,

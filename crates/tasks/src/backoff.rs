@@ -19,6 +19,7 @@ use chrono::Duration;
 /// assert_eq!(40, exponential(Duration::minutes(5), 2, 3).num_minutes());
 /// assert_eq!(80, exponential(Duration::minutes(5), 2, 4).num_minutes());
 /// ```
+#[allow(clippy::cast_lossless)]
 pub fn exponential(delay: Duration, base: u16, retries: u16) -> Duration {
     let duration = Duration::minutes(delay.num_minutes() * base.pow(retries as u32) as i64);
     Duration::days(1).min(duration)
@@ -40,6 +41,7 @@ pub fn exponential(delay: Duration, base: u16, retries: u16) -> Duration {
 /// assert_eq!(12, linear(Duration::minutes(4), 3).num_minutes());
 /// assert_eq!(16, linear(Duration::minutes(4), 4).num_minutes());
 /// ````
+#[allow(clippy::cast_lossless)]
 pub fn linear(delay: Duration, retries: u16) -> Duration {
     let duration = Duration::minutes(delay.num_minutes() * retries as i64);
     Duration::days(1).min(duration)

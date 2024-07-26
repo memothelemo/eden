@@ -52,8 +52,8 @@ fn catch_unwind<F: FnOnce() -> R, R>(f: F) -> eden_utils::Result<R, PerformTaskE
         Err(cause) => {
             let cause = cause
                 .downcast_ref::<&'static str>()
-                .map(|v| v.to_string())
-                .or_else(|| cause.downcast_ref::<String>().map(|v| v.to_string()))
+                .map(std::string::ToString::to_string)
+                .or_else(|| cause.downcast_ref::<String>().map(String::to_string))
                 .unwrap_or_else(|| "unknown".into());
 
             Err(TaskPanicked(cause))

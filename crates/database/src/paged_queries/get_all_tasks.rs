@@ -11,6 +11,7 @@ pub struct GetAllTasks<'a> {
 }
 
 impl<'a> GetAllTasks<'a> {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             status: None,
