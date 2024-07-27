@@ -1,6 +1,6 @@
+use async_trait::async_trait;
 use chrono::{DateTime, TimeDelta, Utc};
 use eden_utils::Result;
-use futures::future::BoxFuture;
 use std::fmt::Debug;
 use uuid::Uuid;
 
@@ -24,6 +24,7 @@ pub struct TaskPerformInfo {
 
 // We need this trait depend on Deserialize & Serialize so that we can
 // actually process it into the database and do other things later on.
+#[async_trait]
 pub trait Task: Debug + Send + Sync + 'static {
     // It must be cloned, preferably wrapped with std::sync::Arc type.
     type State: Clone + Send + Sync + 'static;
@@ -89,11 +90,7 @@ pub trait Task: Debug + Send + Sync + 'static {
     /// Its return type, [`TaskResult`] determines whether the task needs to be
     /// retried again or ignored/retried again in a very later time after it
     /// receives a successful status.
-    fn perform(
-        &self,
-        info: &TaskPerformInfo,
-        state: Self::State,
-    ) -> BoxFuture<'_, Result<TaskResult>>;
+    async fn perform(&self, info: &TaskPerformInfo, state: Self::State) -> Result<TaskResult>;
 }
 
 #[derive(Debug)]

@@ -1,8 +1,7 @@
-use eden_tasks::{prelude::*, Scheduled};
+use eden_tasks::prelude::*;
 use eden_utils::error::ResultExt;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::str::FromStr;
-use thiserror::Error;
 use tracing::level_filters::LevelFilter;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt, Layer};
@@ -11,6 +10,7 @@ use tracing_subscriber::{layer::SubscriberExt, Layer};
 #[serde(crate = "serde")]
 pub struct CleanupUsers;
 
+#[async_trait]
 impl Task for CleanupUsers {
     type State = ();
 
@@ -25,23 +25,16 @@ impl Task for CleanupUsers {
     where
         Self: Sized,
     {
-        TaskSchedule::Once
+        TaskSchedule::interval(TimeDelta::seconds(10))
     }
 
     #[allow(clippy::unwrap_used)]
-    fn perform(
+    async fn perform(
         &self,
         _info: &TaskPerformInfo,
         _state: Self::State,
-    ) -> BoxFuture<'_, eden_utils::Result<TaskResult>> {
-        #[derive(Debug, Error)]
-        #[error("oh no!")]
-        struct Omg;
-
-        Box::pin(async {
-            std::fs::read("foo").change_context(Omg).anonymize_error()?;
-            Ok(TaskResult::Completed)
-        })
+    ) -> eden_utils::Result<TaskResult> {
+        Ok(TaskResult::Completed)
     }
 }
 
@@ -61,9 +54,8 @@ async fn bootstrap() -> eden_utils::Result<()> {
 
     queue.clear_all().await?;
     queue.start().await?;
-    queue.schedule(CleanupUsers, Scheduled::now()).await?;
 
-    tokio::signal::ctrl_c().await.anonymize_error()?;
+    eden_utils::shutdown_signal().await;
     queue.shutdown().await;
 
     Ok(())
@@ -80,7 +72,6 @@ fn start() -> eden_utils::Result<()> {
 
     let log_layer = tracing_subscriber::fmt::layer()
         .pretty()
-        .without_time()
         .with_filter(env_filter);
 
     let subscriber = tracing_subscriber::Registry::default()

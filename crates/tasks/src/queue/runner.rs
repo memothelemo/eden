@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use thiserror::Error;
+use tokio::sync::SemaphorePermit;
 use tracing::Instrument;
 use uuid::Uuid;
 
@@ -21,6 +22,21 @@ impl<S> Queue<S>
 where
     S: Clone + Send + Sync + 'static,
 {
+    /// Checks the semaphore status of the queueing system. If it reaches the
+    /// maximum concurrent threads, pause for a bit then perform a task once
+    /// the queue's semaphore's permits reach the maximum concurrent threads.
+    async fn permit_process_task(&self) -> Option<SemaphorePermit<'_>> {
+        if self.0.semaphore.available_permits() == 0 {
+            tracing::debug!(
+                "queue semaphore ran out of permits, waiting for task(s) to be finished"
+            );
+        }
+
+        let result = self.0.semaphore.acquire().await.ok();
+        tracing::debug!("queue semaphore permitted task to run");
+        result
+    }
+
     async fn perform_queued_task_inner(&self, task_info: &Task) -> PerformTaskAction {
         let Some(registry_meta) = self.0.registry.get(task_info.data.kind.as_str()) else {
             tracing::warn!(
@@ -38,6 +54,10 @@ where
             last_retry: task_info.last_retry,
             is_retrying: task_info.attempts > 0,
         };
+
+        let _permit = self.permit_process_task().await;
+        self.0.running_tasks.fetch_add(1, Ordering::SeqCst);
+        self.0.running_tasks_notify.notify_waiters();
 
         let task = match self.deserialize_task(&task_info.data, &registry_meta) {
             Ok(n) => n,
@@ -71,6 +91,9 @@ where
                     .unwrap_or(PerformTaskAction::RetryOnError)
             }
         };
+
+        self.0.running_tasks.fetch_sub(1, Ordering::SeqCst);
+        self.0.running_tasks_notify.notify_waiters();
 
         // improvise actions with RetryOnError and RetryOnTimedOut into RetryIn since
         // we cannot access the deserialized task anymore
@@ -224,7 +247,6 @@ where
                 task.task_type
             );
         };
-        task.set_running(true);
 
         // Generate a fake queued job data
         let fake_queued_task_id = Uuid::new_v4();
@@ -268,6 +290,12 @@ where
                 tracing::field::display(registry_meta.is_periodic),
             );
         }
+
+        let _permit = self.permit_process_task().await;
+        task.set_running(true);
+
+        self.0.running_tasks.fetch_add(1, Ordering::SeqCst);
+        self.0.running_tasks_notify.notify_waiters();
 
         let deserialized_task = match self.deserialize_task(&raw_data, &registry_meta) {
             Ok(n) => n,
@@ -343,6 +371,10 @@ where
             );
             task.set_blocked(true).await;
         }
+
+        self.0.running_tasks.fetch_sub(1, Ordering::SeqCst);
+        self.0.running_tasks_notify.notify_waiters();
+
         task.set_running(false);
     }
 
@@ -408,6 +440,8 @@ where
         tracing::trace!("runner loop started");
 
         let now = Utc::now();
+        let instant = std::time::Instant::now();
+
         let shutdown = queue.0.shutdown.cancelled();
         tokio::select! {
             _ = periodic_interval.tick() => {
@@ -431,11 +465,12 @@ where
                 });
             },
             () = shutdown => {
-                tracing::debug!("requested shutdown from queue. closing runner thread...");
+                tracing::debug!("requested shutdown from queue. closed runner thread...");
                 return;
             },
         }
 
-        tracing::trace!("runner loop ended");
+        let elapsed = instant.elapsed();
+        tracing::trace!(?elapsed, "runner loop ended");
     }
 }

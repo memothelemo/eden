@@ -1,7 +1,8 @@
 use super::{Queue, QueueConfig, QueueInner};
 use dashmap::DashMap;
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 
@@ -18,15 +19,23 @@ impl QueueConfig {
     where
         S: Clone + Send + Sync + 'static,
     {
+        let semaphore = Semaphore::new(self.concurrency);
         Queue(Arc::new(QueueInner {
             config: self,
-            periodic_tasks: Arc::new(RwLock::new(Vec::new())),
+            periodic_tasks: RwLock::new(Vec::new()),
+
             pool,
-            registry: Arc::new(DashMap::new()),
-            runner_handle: Arc::new(Mutex::new(None)),
-            running_tasks: TaskTracker::new(),
-            shutdown: CancellationToken::new(),
+            registry: DashMap::new(),
             state,
+
+            future_tracker: TaskTracker::new(),
+            runner_handle: Mutex::new(None),
+
+            running_tasks: AtomicUsize::new(0),
+            running_tasks_notify: Notify::new(),
+
+            semaphore,
+            shutdown: CancellationToken::new(),
         }))
     }
 }

@@ -10,6 +10,7 @@ rust-version.workspace = true
 eden-db.workspace = true
 eden-utils.workspace = true
 
+async-trait.workspace = true
 chrono.workspace = true
 cron_clock = "=0.8.0"
 dashmap.workspace = true

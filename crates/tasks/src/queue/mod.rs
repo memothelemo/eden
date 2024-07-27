@@ -6,8 +6,9 @@ use eden_utils::error::{AnyResultExt, ErrorExt, ResultExt};
 use eden_utils::{Error, ErrorCategory, Result};
 use serde::Serialize;
 use sqlx::{pool::PoolConnection, Transaction};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock, Semaphore};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
@@ -170,10 +171,35 @@ where
     #[allow(clippy::let_underscore_must_use)]
     pub async fn shutdown(&self) {
         tracing::info!("shutting down background queue process");
-
         self.0.shutdown.cancel();
-        self.0.running_tasks.close();
-        self.0.running_tasks.wait().await;
+
+        // log any tasks left to run
+        let mut abort = false;
+        loop {
+            let running_tasks = self.0.running_tasks.load(Ordering::SeqCst);
+            if running_tasks == 0 {
+                tracing::info!("all task(s) finished");
+                break;
+            }
+            tracing::info!("waiting for {running_tasks} task(s) to finish");
+
+            let notify = self.0.running_tasks_notify.notified();
+            let stop_signal = eden_utils::shutdown_signal();
+            tokio::select! {
+                () = notify => {},
+                () = stop_signal => {
+                    tracing::warn!("shutdown signal triggered. aborting all running task(s)");
+                    abort = true;
+                    break;
+                },
+            };
+        }
+
+        // Wait for all futures to finally ended, if not aborted
+        if !abort {
+            self.0.future_tracker.close();
+            self.0.future_tracker.wait().await;
+        }
     }
 
     /// Processes incoming tasks indefinitely.
@@ -406,7 +432,7 @@ where
         F: futures::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        self.0.running_tasks.spawn(task);
+        self.0.future_tracker.spawn(task);
     }
 
     #[allow(clippy::unused_self)]
@@ -469,11 +495,20 @@ struct QueueInner<S> {
     // periodic tasks that are blocked from running (maybe it is already running
     // or being scheduled from the database because of an error)
     config: QueueConfig,
-    periodic_tasks: Arc<RwLock<Vec<Arc<PeriodicTask>>>>,
+    periodic_tasks: RwLock<Vec<Arc<PeriodicTask>>>,
+
     pool: sqlx::PgPool,
-    registry: Arc<DashMap<&'static str, TaskRegistryMeta<S>>>,
-    runner_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
-    running_tasks: TaskTracker,
-    shutdown: CancellationToken,
+    registry: DashMap<&'static str, TaskRegistryMeta<S>>,
     state: S,
+
+    future_tracker: TaskTracker,
+    runner_handle: Mutex<Option<JoinHandle<()>>>,
+
+    running_tasks: AtomicUsize,
+    running_tasks_notify: Notify,
+
+    // this is to control maximum concurrent running tasks
+    // (including periodic and queued)
+    semaphore: Semaphore,
+    shutdown: CancellationToken,
 }
