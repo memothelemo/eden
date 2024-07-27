@@ -6,6 +6,7 @@ use crate::utils::{PagedQuery, Paginated};
 
 #[must_use]
 pub struct GetAllTasks<'a> {
+    periodic: Option<bool>,
     status: Option<TaskStatus>,
     task_type: Option<&'a str>,
 }
@@ -14,9 +15,15 @@ impl<'a> GetAllTasks<'a> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
+            periodic: None,
             status: None,
             task_type: None,
         }
+    }
+
+    pub fn periodic(mut self, periodic: bool) -> Self {
+        self.periodic = Some(periodic);
+        self
     }
 
     pub fn status(mut self, status: TaskStatus) -> Self {
@@ -45,6 +52,9 @@ impl<'a> PagedQuery for GetAllTasks<'a> {
         if let Some(task_type) = self.task_type.as_ref() {
             args.add(task_type);
         }
+        if let Some(periodic) = self.periodic {
+            args.add(periodic);
+        }
         args
     }
 
@@ -64,6 +74,13 @@ impl<'a> PagedQuery for GetAllTasks<'a> {
             count += 1;
             write!(f, "data->>'type' = ${count} ")?;
         }
+        if self.periodic.is_some() {
+            if count == 0 {
+                write!(f, "WHERE ")?;
+            }
+            count += 1;
+            write!(f, "periodic = ${count} ")?;
+        }
         f.write_str("FOR UPDATE SKIP LOCKED")
     }
 }
@@ -76,7 +93,25 @@ mod tests {
     use super::*;
 
     #[sqlx::test(migrator = "crate::MIGRATOR")]
-    async fn test_task_type(pool: sqlx::PgPool) -> eden_utils::Result<()> {
+    async fn test_periodic_filter(pool: sqlx::PgPool) -> eden_utils::Result<()> {
+        let mut conn = pool.acquire().await.anonymize_error()?;
+        test_utils::prepare_sample_tasks(&mut conn).await?;
+
+        let mut stream = Paginated::new(GetAllTasks::new().periodic(true)).size(3);
+        while let Some(data) = stream.next(&mut conn).await.anonymize_error()? {
+            assert!(data.iter().all(|v| v.periodic == true));
+        }
+
+        let mut stream = Paginated::new(GetAllTasks::new().periodic(false)).size(3);
+        while let Some(data) = stream.next(&mut conn).await.anonymize_error()? {
+            assert!(data.iter().all(|v| v.periodic == false));
+        }
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn test_task_type_filter(pool: sqlx::PgPool) -> eden_utils::Result<()> {
         let mut conn = pool.acquire().await.anonymize_error()?;
         test_utils::prepare_sample_tasks(&mut conn).await?;
 

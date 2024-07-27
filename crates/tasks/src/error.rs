@@ -1,8 +1,8 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-#[error("already started processing incoming tasks")]
-pub struct AlreadyStartedError;
+#[error("unable to start queue")]
+pub struct StartQueueError;
 
 #[derive(Debug, Error)]
 #[error("could not clear all task(s)")]

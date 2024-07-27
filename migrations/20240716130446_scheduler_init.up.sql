@@ -31,6 +31,7 @@ CREATE TABLE tasks (
     "deadline" TIMESTAMP NOT NULL,
     "failed_attempts" INTEGER NOT NULL DEFAULT 0,
     "last_retry" TIMESTAMP,
+    "periodic" BOOLEAN NOT NULL DEFAULT false,
     "priority" TASK_PRIORITY NOT NULL DEFAULT 'medium',
     "status" TASK_STATUS NOT NULL DEFAULT 'queued'
 );

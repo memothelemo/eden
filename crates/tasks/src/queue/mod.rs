@@ -2,12 +2,13 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use eden_db::forms::InsertTaskForm;
 use eden_db::schema::{Task, TaskRawData, TaskStatus};
-use eden_utils::error::{AnyResultExt, ResultExt};
+use eden_utils::error::{AnyResultExt, ErrorExt, ResultExt};
 use eden_utils::{Error, ErrorCategory, Result};
+use futures::FutureExt;
 use serde::Serialize;
 use sqlx::{pool::PoolConnection, Transaction};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
@@ -16,14 +17,16 @@ use uuid::Uuid;
 mod builder;
 mod catch_unwind;
 mod config;
-mod error_tags;
+mod periodic;
 mod registry;
 mod runner;
 
-use crate::Scheduled;
-use crate::{error::*, Task as AnyTask};
+use crate::{error::*, Task as AnyTask, TaskResult};
+use crate::{Scheduled, TaskPerformInfo};
 
 use self::builder::BuilderState;
+use self::catch_unwind::CatchUnwindTaskFuture;
+use self::periodic::PeriodicTask;
 use self::registry::TaskRegistryMeta;
 
 pub use self::config::*;
@@ -59,7 +62,9 @@ where
             .attach_printable("could not commit database transaction")?;
 
         // clear all blocked tasks if necessary and not running
-        todo!("unblock all periodic tasks");
+        for periodic_task in self.0.periodic_tasks.read().await.iter() {
+            periodic_task.set_blocked(false).await;
+        }
 
         Ok(deleted)
     }
@@ -97,11 +102,19 @@ where
             .await
             .transform_context(DeleteTaskError)?;
 
-        Task::delete(&mut conn, id)
+        let task = Task::delete(&mut conn, id)
             .await
             .change_context(DeleteTaskError)
-            .attach_printable_lazy(|| format!("task.id = {id:?}"))
-            .map(|v| v.is_some())
+            .attach_printable_lazy(|| format!("task.id = {id:?}"))?;
+
+        // unblock if it is a periodic task
+        if let Some(task) = task.as_ref() {
+            if let Some(periodic_task) = self.get_periodic_task(&task.data.kind).await {
+                periodic_task.set_blocked(false).await;
+            }
+        }
+
+        Ok(task.is_some())
     }
 
     pub async fn is_running(&self) -> bool {
@@ -141,7 +154,7 @@ where
             .attach_printable_lazy(|| format!("task.type = {}", T::task_type()))
             .attach_printable_lazy(|| format!("task.data = {task:?}"))?;
 
-        self.queue(task_data, scheduled, None)
+        self.queue(None, false, task_data, scheduled, None)
             .await
             .attach_printable_lazy(|| format!("task.type = {}", T::task_type()))
             .attach_printable_lazy(|| format!("task.data = {task:?}"))
@@ -158,17 +171,31 @@ where
         // wait for the runner handle to be terminated as well
         let mut handle = self.0.runner_handle.lock().await;
         if let Some(handle) = handle.take() {
-            // TOOD: log errors from handle
+            // TODO: log errors from handle
             let _ = handle.await;
         }
     }
 
     /// Processes incoming tasks indefinitely.
-    pub async fn start(&self) -> Result<(), AlreadyStartedError> {
+    pub async fn start(&self) -> Result<(), StartQueueError> {
         let mut handle = self.0.runner_handle.lock().await;
         if handle.is_some() {
-            return Err(Error::context(ErrorCategory::Unknown, AlreadyStartedError));
+            return Err(Error::context(ErrorCategory::Unknown, StartQueueError))
+                .attach_printable("already started processing incoming tasks");
         }
+
+        self.update_periodic_tasks_blacklist()
+            .await
+            .transform_context(StartQueueError)
+            .attach_printable("could not update periodic tasks blacklist")?;
+
+        // Initialize all periodic tasks to have their own deadlines
+        let now = Utc::now();
+        let periodic_tasks = self.0.periodic_tasks.read().await;
+        for task in periodic_tasks.iter() {
+            task.adjust_deadline(now).await;
+        }
+
         *handle = Some(tokio::spawn(runner::runner(self.clone())));
         drop(handle);
 
@@ -204,10 +231,35 @@ where
             .attach_printable("unable to start transaction from the database")
     }
 
+    async fn update_periodic_tasks_blacklist(&self) -> Result<()> {
+        let mut conn = self.db_connection().await?;
+
+        let mut stream = Task::get_all().periodic(true).build().size(50);
+        while let Some(tasks) = stream.next(&mut conn).await.anonymize_error()? {
+            for task in tasks {
+                if let Some(task) = self.get_periodic_task(&task.data.kind).await {
+                    eprintln!("{:?} is blocked", task.task_type);
+                    task.set_blocked(true).await;
+                } else {
+                    eprintln!("unknown periodic task: {:?}", task.data.kind);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn get_periodic_task(&self, task_type: &str) -> Option<Arc<PeriodicTask>> {
+        let tasks = self.0.periodic_tasks.read().await;
+        tasks.iter().find(|v| v.task_type == task_type).cloned()
+    }
+
     /// Unsafe version of [`Queue::schedule`] but any registered task
     /// (periodic or persistent) can be scheduled.
     async fn queue(
         &self,
+        id: Option<Uuid>,
+        is_periodic: bool,
         raw_data: TaskRawData,
         scheduled: Scheduled,
         now: Option<DateTime<Utc>>,
@@ -226,12 +278,16 @@ where
         let deadline = scheduled.timestamp(now);
         let priority = (*registry_meta.priority)();
         if registry_meta.is_periodic {
-            todo!()
+            if let Some(task) = self.get_periodic_task(&registry_meta.kind).await {
+                task.set_blocked(true).await;
+            }
         }
 
         let form = InsertTaskForm::builder()
+            .id(id)
             .data(raw_data)
             .deadline(deadline)
+            .periodic(is_periodic)
             .priority(priority)
             .build();
 
@@ -246,6 +302,83 @@ where
             .attach_printable("could not insert task into the database")?;
 
         Ok(queued_task.id)
+    }
+
+    /// Performs any task, regardless queued or periodic
+    async fn perform_task(
+        &self,
+        task: &(dyn AnyTask<State = S> + 'static),
+        perform_info: &TaskPerformInfo,
+        registry_meta: &TaskRegistryMeta<S>,
+    ) -> Result<PerformTaskAction, PerformTaskError> {
+        println!(
+            "running task {} ({}); data = {task:?}",
+            perform_info.id, registry_meta.kind
+        );
+
+        let task_future = task.perform(perform_info, self.0.state.clone()).boxed();
+        let task_future = CatchUnwindTaskFuture::new(task_future);
+
+        let timeout = runner::resolve_time_delta(task.timeout())
+            .ok_or_else(|| Error::context(ErrorCategory::Unknown, PerformTaskError))
+            .attach_printable_lazy(|| {
+                format!("could not get task timeout for {:?}", registry_meta.kind)
+            })
+            .attach(PerformTaskAction::Delete)?;
+
+        let result = tokio::time::timeout(timeout, task_future)
+            .await
+            .change_context(PerformTaskError)
+            .map_err(|e| e.attach(PerformTaskAction::RetryOnError))
+            .flatten();
+
+        let action = match result {
+            Ok(TaskResult::Completed) => PerformTaskAction::Completed,
+            Ok(TaskResult::RetryIn(n)) => PerformTaskAction::RetryIn(n),
+            Ok(TaskResult::Fail(n)) => {
+                eprintln!(
+                    "task {} with type {:?}; task got a fatal error: {n}",
+                    perform_info.id, registry_meta.kind,
+                );
+                PerformTaskAction::Delete
+            }
+            Err(error) => {
+                let error = error.anonymize();
+                eprintln!(
+                    "task {} with type {:?}; task got an error: {error}",
+                    perform_info.id, registry_meta.kind,
+                );
+                PerformTaskAction::RetryOnError
+            }
+        };
+
+        Ok(action)
+    }
+
+    #[allow(unused)]
+    fn spawn_fut<F>(&self, task: F)
+    where
+        F: futures::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.0.running_tasks.spawn(task);
+    }
+
+    #[allow(clippy::unused_self)]
+    fn deserialize_task(
+        &self,
+        raw_data: &TaskRawData,
+        registry_meta: &TaskRegistryMeta<S>,
+    ) -> Result<Box<dyn AnyTask<State = S>>, PerformTaskError> {
+        let deserializer = &*registry_meta.deserializer;
+        let task = deserializer(raw_data.inner.clone())
+            .map_err(|e| Error::any(ErrorCategory::Unknown, e))
+            .transform_context(PerformTaskError)
+            .attach_printable_lazy(|| {
+                format!("could not deserialize task for {:?}", registry_meta.kind)
+            })?;
+
+        Ok(task)
     }
 
     #[allow(clippy::unused_self)]
@@ -277,10 +410,21 @@ where
     }
 }
 
+/// What the scheduler should do after a task is performed
+#[derive(Debug, Clone, Copy)]
+enum PerformTaskAction {
+    Delete,
+    Completed,
+    RetryIn(chrono::TimeDelta),
+    RetryOnError,
+    RetryOnTimedOut,
+}
+
 struct QueueInner<S> {
     // periodic tasks that are blocked from running (maybe it is already running
     // or being scheduled from the database because of an error)
     config: QueueConfig,
+    periodic_tasks: Arc<RwLock<Vec<Arc<PeriodicTask>>>>,
     pool: sqlx::PgPool,
     registry: Arc<DashMap<&'static str, TaskRegistryMeta<S>>>,
     runner_handle: Arc<Mutex<Option<JoinHandle<()>>>>,

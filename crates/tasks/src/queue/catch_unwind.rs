@@ -61,5 +61,5 @@ fn catch_unwind<F: FnOnce() -> R, R>(f: F) -> eden_utils::Result<R, PerformTaskE
     }
     .change_context(PerformTaskError)
     .attach_printable("task panicked while the task ran")
-    .attach(super::error_tags::TaskPanicked)
+    .attach(super::PerformTaskAction::RetryOnError)
 }

@@ -5,6 +5,44 @@ use std::str::FromStr;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(crate = "serde")]
+pub struct CleanupUsersHigh;
+
+impl Task for CleanupUsersHigh {
+    type State = ();
+
+    fn task_type() -> &'static str
+    where
+        Self: Sized,
+    {
+        "cleanup-users-high"
+    }
+
+    fn priority() -> eden_tasks::TaskPriority
+    where
+        Self: Sized,
+    {
+        eden_tasks::TaskPriority::High
+    }
+
+    fn schedule() -> TaskSchedule
+    where
+        Self: Sized,
+    {
+        TaskSchedule::interval(TimeDelta::seconds(10))
+    }
+
+    #[allow(clippy::unwrap_used)]
+    fn perform(
+        &self,
+        _info: &TaskPerformInfo,
+        _state: Self::State,
+    ) -> BoxFuture<'_, eden_utils::Result<TaskResult>> {
+        Box::pin(async { Ok(TaskResult::Completed) })
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(crate = "serde")]
 pub struct CleanupUsers;
 
 impl Task for CleanupUsers {
@@ -30,8 +68,10 @@ impl Task for CleanupUsers {
         _info: &TaskPerformInfo,
         _state: Self::State,
     ) -> BoxFuture<'_, eden_utils::Result<TaskResult>> {
-        let file = std::fs::read("foo").anonymize_error().unwrap_err();
-        Box::pin(async { Ok(TaskResult::Completed) })
+        Box::pin(async {
+            std::fs::read("whoops!").unwrap();
+            Ok(TaskResult::Completed)
+        })
     }
 }
 
@@ -47,7 +87,8 @@ async fn bootstrap() -> eden_utils::Result<()> {
         .concurrency(25)
         .poll_interval(TimeDelta::seconds(1))
         .build(pool.clone(), ())
-        .register_task::<CleanupUsers>();
+        .register_task::<CleanupUsers>()
+        .register_task::<CleanupUsersHigh>();
 
     queue.start().await?;
     // queue.schedule(task, Scheduled::now()).await?;

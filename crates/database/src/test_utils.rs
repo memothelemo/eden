@@ -163,7 +163,7 @@ pub async fn prepare_sample_tasks(conn: &mut sqlx::PgConnection) -> eden_utils::
     // - deadline_1 - medium priority
     // - deadline_3 - high priority and so on
     macro_rules! shorthand_insert {
-        ($deadline:ident, $priority:ident, $kind:literal) => {{
+        ($deadline:ident, $priority:ident, $kind:literal, $periodic:expr) => {{
             Task::insert(
                 conn,
                 InsertTaskForm::builder()
@@ -180,21 +180,21 @@ pub async fn prepare_sample_tasks(conn: &mut sqlx::PgConnection) -> eden_utils::
         }};
     }
 
-    shorthand_insert!(deadline_1, High, "organ");
-    shorthand_insert!(deadline_3, Low, "organ");
-    shorthand_insert!(deadline_4, High, "organ");
-    shorthand_insert!(deadline_1, Low, "organ");
-    shorthand_insert!(deadline_5, High, "organ");
-    shorthand_insert!(deadline_2, Low, "organ");
-    shorthand_insert!(deadline_5, Medium, "organ");
-    shorthand_insert!(deadline_1, Medium, "organ");
-    shorthand_insert!(deadline_3, High, "foo");
-    shorthand_insert!(deadline_5, Low, "foo");
-    shorthand_insert!(deadline_2, High, "foo");
-    shorthand_insert!(deadline_4, Medium, "foo");
-    shorthand_insert!(deadline_2, Medium, "foo");
-    shorthand_insert!(deadline_3, Medium, "foo");
-    shorthand_insert!(deadline_4, Low, "foo");
+    shorthand_insert!(deadline_1, High, "organ", true);
+    shorthand_insert!(deadline_3, Low, "organ", true);
+    shorthand_insert!(deadline_4, High, "organ", false);
+    shorthand_insert!(deadline_1, Low, "organ", false);
+    shorthand_insert!(deadline_5, High, "organ", true);
+    shorthand_insert!(deadline_2, Low, "organ", true);
+    shorthand_insert!(deadline_5, Medium, "organ", false);
+    shorthand_insert!(deadline_1, Medium, "organ", false);
+    shorthand_insert!(deadline_3, High, "foo", true);
+    shorthand_insert!(deadline_5, Low, "foo", true);
+    shorthand_insert!(deadline_2, High, "foo", false);
+    shorthand_insert!(deadline_4, Medium, "foo", false);
+    shorthand_insert!(deadline_2, Medium, "foo", true);
+    shorthand_insert!(deadline_3, Medium, "foo", true);
+    shorthand_insert!(deadline_4, Low, "foo", false);
 
     Ok(())
 }

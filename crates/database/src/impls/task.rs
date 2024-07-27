@@ -65,11 +65,13 @@ impl Task {
             .attach_printable("could not serialize task to insert task")?;
 
         sqlx::query_as::<_, Task>(
-            r"INSERT INTO tasks (deadline, priority, status, data)
-            VALUES ($1, $2, $3, $4)
+            r"INSERT INTO tasks (id, deadline, periodic, priority, status, data)
+            VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6)
             RETURNING *",
         )
+        .bind(form.id)
         .bind(form.deadline)
+        .bind(form.periodic)
         .bind(form.priority)
         .bind(form.status)
         .bind(data)
@@ -211,6 +213,34 @@ mod tests {
         // milisecond precision lost for this: assert_eq!(task.deadline, deadline);
         let task = Task::insert(&mut conn, form).await.anonymize_error()?;
         assert_eq!(task.failed_attempts, 0);
+        assert_eq!(task.periodic, false);
+        assert_eq!(task.priority, TaskPriority::High);
+        assert_eq!(task.status, TaskStatus::Queued);
+        assert_eq!(task.data, data);
+
+        // For periodic tasks
+        let deadline = Utc::now();
+        let data = TaskRawData {
+            kind: "foo".into(),
+            inner: serde_json::json!({
+                "currency": "PHP",
+                "deadline": Utc::now(),
+                "payer_id": "613425648685547541",
+                "price": 15.0,
+            }),
+        };
+
+        let form = InsertTaskForm::builder()
+            .deadline(deadline)
+            .priority(TaskPriority::High)
+            .periodic(true)
+            .data(data.clone())
+            .build();
+
+        // milisecond precision lost for this: assert_eq!(task.deadline, deadline);
+        let task = Task::insert(&mut conn, form).await.anonymize_error()?;
+        assert_eq!(task.failed_attempts, 0);
+        assert_eq!(task.periodic, true);
         assert_eq!(task.priority, TaskPriority::High);
         assert_eq!(task.status, TaskStatus::Queued);
         assert_eq!(task.data, data);

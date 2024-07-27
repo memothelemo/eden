@@ -15,6 +15,7 @@ pub struct Task {
     pub deadline: DateTime<Utc>,
     pub failed_attempts: i32,
     pub last_retry: Option<DateTime<Utc>>,
+    pub periodic: bool,
     pub priority: TaskPriority,
     pub status: TaskStatus,
 }
@@ -36,6 +37,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Task {
         let deadline = row.try_get::<NaiveDateTime, _>("deadline")?;
         let failed_attempts = row.try_get("failed_attempts")?;
         let last_retry = row.try_get::<Option<NaiveDateTime>, _>("last_retry")?;
+        let periodic = row.try_get("periodic")?;
         let priority = row.try_get("priority")?;
         let status = row.try_get("status")?;
 
@@ -47,6 +49,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Task {
             deadline: naive_to_dt(deadline),
             failed_attempts,
             last_retry: last_retry.map(naive_to_dt),
+            periodic,
             priority,
             status,
         })
@@ -70,4 +73,15 @@ pub enum TaskStatus {
     Success,
     #[default]
     Queued,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TaskPriority;
+
+    #[test]
+    fn test_task_priority_order() {
+        assert!(TaskPriority::High > TaskPriority::Low);
+        assert!(TaskPriority::Medium > TaskPriority::Low);
+    }
 }

@@ -5,6 +5,7 @@ mod into_impls;
 
 pub use self::category::*;
 pub use self::ext::*;
+use error_stack::iter::RequestRef;
 pub use error_stack::Context;
 
 use self::any::{AnonymizedError, AnyError};
@@ -131,6 +132,14 @@ impl<T: Context> Error<T> {
         N: ?Sized + Send + Sync + 'static,
     {
         self.report.request_ref::<T>().next().is_some()
+    }
+
+    #[must_use]
+    pub fn get_attached<N>(&self) -> RequestRef<'_, N>
+    where
+        N: ?Sized + Send + Sync + 'static,
+    {
+        self.report.request_ref::<N>()
     }
 }
 
