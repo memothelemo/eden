@@ -483,8 +483,15 @@ dependencies = [
 name = "eden-bot"
 version = "0.1.0-alpha.0"
 dependencies = [
+ "async-trait",
+ "chrono",
  "eden-db",
+ "eden-tasks",
  "eden-utils",
+ "rust_decimal",
+ "serde",
+ "sqlx",
+ "tracing",
  "twilight-gateway",
  "twilight-http",
  "twilight-model",

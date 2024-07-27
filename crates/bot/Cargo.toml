@@ -9,7 +9,15 @@ rust-version.workspace = true
 
 [dependencies]
 eden-db.workspace = true
+eden-tasks.workspace = true
 eden-utils.workspace = true
+
+async-trait.workspace = true
+chrono.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
 
 # twilight crates
 twilight-gateway = { version = "0.15.4", features = ["rustls-native-roots", "zlib-simd"] }
