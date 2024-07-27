@@ -10,7 +10,7 @@ use crate::QueryError;
 
 #[must_use]
 pub struct PullAllPendingTasks {
-    pub(crate) max_failed_attempts: i64,
+    pub(crate) max_attempts: i32,
     pub(crate) now: DateTime<Utc>,
 }
 
@@ -20,14 +20,14 @@ impl PagedQuery for PullAllPendingTasks {
     fn build_args(&self) -> PgArguments {
         let mut args = PgArguments::default();
         args.add(TaskStatus::Running);
-        args.add(self.max_failed_attempts);
+        args.add(self.max_attempts);
         args.add(self.now);
         args
     }
 
     fn build_sql(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SELECT * FROM tasks ")?;
-        write!(f, "WHERE status = $1 AND failed_attempts < $2 ")?;
+        write!(f, "WHERE status = $1 AND attempts < $2 ")?;
         write!(f, "AND deadline <= $3 AND updated_at = $3 ")?;
         write!(f, "ORDER BY deadline, priority DESC ")?;
         write!(f, "FOR UPDATE SKIP LOCKED")
@@ -37,15 +37,16 @@ impl PagedQuery for PullAllPendingTasks {
         // this is to better differentiate which tasks are updated now
         sqlx::query(
             r"UPDATE tasks SET status = $1, updated_at = $3,
-                last_retry = CASE WHEN failed_attempts > 0
+                last_retry = CASE WHEN attempts > 0
                     THEN $3
                     ELSE last_retry
                 END
-                WHERE failed_attempts < $2 AND deadline <= $3",
+            WHERE attempts < $2 AND deadline <= $3 AND status = $4",
         )
         .bind(TaskStatus::Running)
-        .bind(self.max_failed_attempts)
+        .bind(self.max_attempts)
         .bind(self.now)
+        .bind(TaskStatus::Queued)
         .execute(conn)
         .await
         .change_context(QueryError)

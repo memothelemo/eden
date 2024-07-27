@@ -11,9 +11,9 @@ pub struct Task {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub attempts: i32,
     pub data: TaskRawData,
     pub deadline: DateTime<Utc>,
-    pub failed_attempts: i32,
     pub last_retry: Option<DateTime<Utc>>,
     pub periodic: bool,
     pub priority: TaskPriority,
@@ -33,9 +33,9 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Task {
         let id = row.try_get("id")?;
         let created_at = row.try_get::<NaiveDateTime, _>("created_at")?;
         let updated_at = row.try_get::<Option<NaiveDateTime>, _>("updated_at")?;
+        let attempts = row.try_get("attempts")?;
         let data = row.try_get::<sqlx::types::Json<TaskRawData>, _>("data")?;
         let deadline = row.try_get::<NaiveDateTime, _>("deadline")?;
-        let failed_attempts = row.try_get("failed_attempts")?;
         let last_retry = row.try_get::<Option<NaiveDateTime>, _>("last_retry")?;
         let periodic = row.try_get("periodic")?;
         let priority = row.try_get("priority")?;
@@ -47,7 +47,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Task {
             updated_at: updated_at.map(naive_to_dt),
             data: data.0,
             deadline: naive_to_dt(deadline),
-            failed_attempts,
+            attempts,
             last_retry: last_retry.map(naive_to_dt),
             periodic,
             priority,

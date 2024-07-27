@@ -1,11 +1,9 @@
-use std::sync::Arc;
-
-use crate::{
-    queue::periodic::PeriodicTask,
-    task::{Task, TaskSchedule},
-};
 use eden_db::schema::TaskPriority;
 use serde::de::DeserializeOwned;
+use std::sync::Arc;
+
+use crate::queue::periodic::PeriodicTask;
+use crate::task::Task;
 
 use super::Queue;
 
@@ -14,7 +12,6 @@ pub struct TaskRegistryMeta<S> {
     pub(crate) kind: &'static str,
     pub(crate) is_periodic: bool,
     pub(crate) priority: PriorityFn,
-    pub(crate) schedule: ScheduleFn,
 }
 
 pub type DeserializerFn<S> = Box<
@@ -25,7 +22,6 @@ pub type DeserializerFn<S> = Box<
 >;
 
 pub type PriorityFn = Box<dyn Fn() -> TaskPriority + Send + Sync + 'static>;
-pub type ScheduleFn = Box<dyn Fn() -> TaskSchedule + Send + Sync + 'static>;
 
 impl<S> Queue<S>
 where
@@ -72,7 +68,6 @@ where
             kind: T::task_type(),
             is_periodic: T::schedule().is_periodic(),
             priority: Box::new(T::priority),
-            schedule: Box::new(T::schedule),
         };
 
         if T::schedule().is_periodic() {

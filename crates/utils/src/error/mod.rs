@@ -143,6 +143,16 @@ impl<T: Context> Error<T> {
     }
 }
 
+impl Error {
+    #[must_use]
+    pub fn get_attached_any<N>(&self) -> RequestRef<'_, N>
+    where
+        N: ?Sized + Send + Sync + 'static,
+    {
+        self.report.request_ref::<N>()
+    }
+}
+
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Error")

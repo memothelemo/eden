@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use eden_db::forms::InsertTaskForm;
+use eden_db::forms::{InsertTaskForm, UpdateTaskForm};
 use eden_db::schema::{Task, TaskRawData, TaskStatus};
 use eden_utils::error::{AnyResultExt, ErrorExt, ResultExt};
 use eden_utils::{Error, ErrorCategory, Result};
@@ -154,7 +154,7 @@ where
             .attach_printable_lazy(|| format!("task.type = {}", T::task_type()))
             .attach_printable_lazy(|| format!("task.data = {task:?}"))?;
 
-        self.queue(None, false, task_data, scheduled, None)
+        self.queue(None, false, task_data, scheduled, None, 0)
             .await
             .attach_printable_lazy(|| format!("task.type = {}", T::task_type()))
             .attach_printable_lazy(|| format!("task.data = {task:?}"))
@@ -254,6 +254,34 @@ where
         tasks.iter().find(|v| v.task_type == task_type).cloned()
     }
 
+    /// Attempts to requeue registered task
+    async fn requeue(
+        &self,
+        id: Uuid,
+        scheduled: Scheduled,
+        now: Option<DateTime<Utc>>,
+        attempts: i32,
+    ) -> Result<(), ScheduleTaskError> {
+        let deadline = scheduled.timestamp(now);
+        let form = UpdateTaskForm::builder()
+            .attempts(Some(attempts + 1))
+            .deadline(Some(deadline))
+            .status(Some(TaskStatus::Queued))
+            .build();
+
+        let mut conn = self
+            .db_connection()
+            .await
+            .transform_context(ScheduleTaskError)?;
+
+        Task::update(&mut conn, id, form)
+            .await
+            .change_context(ScheduleTaskError)
+            .attach_printable("could not requeue task into the database")?;
+
+        Ok(())
+    }
+
     /// Unsafe version of [`Queue::schedule`] but any registered task
     /// (periodic or persistent) can be scheduled.
     async fn queue(
@@ -263,6 +291,7 @@ where
         raw_data: TaskRawData,
         scheduled: Scheduled,
         now: Option<DateTime<Utc>>,
+        attempts: i32,
     ) -> Result<Uuid, ScheduleTaskError> {
         // Checking if this specified task is registered in the registry
         let Some(registry_meta) = self.0.registry.get(raw_data.kind.as_str()) else {
@@ -285,6 +314,7 @@ where
 
         let form = InsertTaskForm::builder()
             .id(id)
+            .attempts(attempts)
             .data(raw_data)
             .deadline(deadline)
             .periodic(is_periodic)
@@ -329,7 +359,7 @@ where
         let result = tokio::time::timeout(timeout, task_future)
             .await
             .change_context(PerformTaskError)
-            .map_err(|e| e.attach(PerformTaskAction::RetryOnError))
+            .map_err(|e| e.attach(PerformTaskAction::RetryOnTimedOut))
             .flatten();
 
         let action = match result {

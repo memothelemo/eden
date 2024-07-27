@@ -27,9 +27,9 @@ CREATE TABLE tasks (
         DEFAULT (now() at TIME ZONE ('utc')),
     "updated_at" TIMESTAMP,
 
+    "attempts" INTEGER NOT NULL DEFAULT 0,
     "data" JSONB NOT NULL,
     "deadline" TIMESTAMP NOT NULL,
-    "failed_attempts" INTEGER NOT NULL DEFAULT 0,
     "last_retry" TIMESTAMP,
     "periodic" BOOLEAN NOT NULL DEFAULT false,
     "priority" TASK_PRIORITY NOT NULL DEFAULT 'medium',

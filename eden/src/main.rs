@@ -1,13 +1,13 @@
-use eden_tasks::prelude::*;
+use eden_tasks::{prelude::*, Scheduled};
 use eden_utils::error::ResultExt;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::str::FromStr;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(crate = "serde")]
-pub struct CleanupUsersHigh;
+pub struct CleanupUsersQueued;
 
-impl Task for CleanupUsersHigh {
+impl Task for CleanupUsersQueued {
     type State = ();
 
     fn task_type() -> &'static str
@@ -28,7 +28,7 @@ impl Task for CleanupUsersHigh {
     where
         Self: Sized,
     {
-        TaskSchedule::interval(TimeDelta::seconds(10))
+        TaskSchedule::Once
     }
 
     #[allow(clippy::unwrap_used)]
@@ -85,13 +85,13 @@ async fn bootstrap() -> eden_utils::Result<()> {
 
     let queue = eden_tasks::Queue::builder()
         .concurrency(25)
-        .poll_interval(TimeDelta::seconds(1))
+        .periodic_poll_interval(TimeDelta::seconds(1))
         .build(pool.clone(), ())
         .register_task::<CleanupUsers>()
-        .register_task::<CleanupUsersHigh>();
+        .register_task::<CleanupUsersQueued>();
 
     queue.start().await?;
-    // queue.schedule(task, Scheduled::now()).await?;
+    queue.schedule(CleanupUsersQueued, Scheduled::now()).await?;
 
     tokio::signal::ctrl_c().await.anonymize_error()?;
     queue.shutdown().await;

@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use eden_utils::error::AnyResultExt;
 use eden_utils::{error::ResultExt, Result};
 use uuid::Uuid;
@@ -14,7 +14,7 @@ impl Task {
         sqlx::query_as::<_, Self>(
             r"UPDATE tasks
             SET status = $1,
-                failed_attempts = failed_attempts + 1
+                attempts = attempts + 1
             WHERE id = $2
             RETURNING *",
         )
@@ -43,13 +43,43 @@ impl Task {
     }
 
     pub fn pull_all_pending(
-        max_failed_attempts: i64,
+        max_attempts: i32,
         now: Option<DateTime<Utc>>,
     ) -> Paginated<PullAllPendingTasks> {
         Paginated::new(PullAllPendingTasks {
-            max_failed_attempts,
+            max_attempts,
             now: now.unwrap_or_else(Utc::now),
         })
+    }
+
+    pub async fn requeue_stalled(
+        conn: &mut sqlx::PgConnection,
+        threshold: TimeDelta,
+        now: Option<DateTime<Utc>>,
+    ) -> Result<u64, QueryError> {
+        sqlx::query(
+            r"UPDATE tasks
+            SET status = $1, updated_at = $2
+            WHERE id IN (
+                SELECT id
+                FROM tasks
+                WHERE status = $3 AND current_timestamp >=
+                    TO_TIMESTAMP(EXTRACT(EPOCH FROM CASE WHEN last_retry IS NULL
+                        THEN current_timestamp
+                        ELSE last_retry
+                    END) + EXTRACT(EPOCH FROM $4))
+                FOR UPDATE SKIP LOCKED
+            )",
+        )
+        .bind(TaskStatus::Queued)
+        .bind(now)
+        .bind(TaskStatus::Running)
+        .bind(threshold)
+        .execute(conn)
+        .await
+        .change_context(QueryError)
+        .attach_printable("could not requeue stalled tasks")
+        .map(|v| v.rows_affected())
     }
 }
 
@@ -65,12 +95,13 @@ impl Task {
             .attach_printable("could not serialize task to insert task")?;
 
         sqlx::query_as::<_, Task>(
-            r"INSERT INTO tasks (id, deadline, periodic, priority, status, data)
-            VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6)
+            r"INSERT INTO tasks (id, deadline, attempts, periodic, priority, status, data)
+            VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7)
             RETURNING *",
         )
         .bind(form.id)
         .bind(form.deadline)
+        .bind(form.attempts)
         .bind(form.periodic)
         .bind(form.priority)
         .bind(form.status)
@@ -100,7 +131,7 @@ impl Task {
         sqlx::query_as::<_, Task>(
             r"UPDATE tasks
             SET deadline = COALESCE($1, deadline),
-                failed_attempts = COALESCE($2, failed_attempts),
+                attempts = COALESCE($2, attempts),
                 last_retry = COALESCE($3, last_retry),
                 priority = COALESCE($4, priority),
                 status = COALESCE($5, status),
@@ -110,7 +141,7 @@ impl Task {
             RETURNING *",
         )
         .bind(form.deadline)
-        .bind(form.failed_attempts)
+        .bind(form.attempts)
         .bind(form.last_retry)
         .bind(form.priority)
         .bind(form.status)
@@ -170,6 +201,36 @@ mod tests {
     use chrono::Utc;
 
     #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn test_requeue_stalled(pool: sqlx::PgPool) -> eden_utils::Result<()> {
+        let mut conn = pool.acquire().await.anonymize_error()?;
+
+        let now = Utc::now();
+        let threshold = TimeDelta::seconds(5);
+
+        let within_threshold = now + TimeDelta::seconds(3);
+        let outside_threshold = now - TimeDelta::seconds(10);
+
+        let task_1 = test_utils::generate_task(&mut conn).await?;
+        let form = UpdateTaskForm::builder()
+            .status(Some(TaskStatus::Running))
+            .last_retry(Some(outside_threshold))
+            .build();
+        Task::update(&mut conn, task_1.id, form).await?;
+
+        let task_2 = test_utils::generate_task(&mut conn).await?;
+        let form = UpdateTaskForm::builder()
+            .status(Some(TaskStatus::Running))
+            .last_retry(Some(within_threshold))
+            .build();
+        Task::update(&mut conn, task_2.id, form).await?;
+
+        let total = Task::requeue_stalled(&mut conn, threshold, Some(now)).await?;
+        assert_eq!(total, 1);
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
     async fn test_from_id(pool: sqlx::PgPool) -> eden_utils::Result<()> {
         let mut conn = pool.acquire().await.anonymize_error()?;
         let task = test_utils::generate_task(&mut conn).await?;
@@ -212,7 +273,7 @@ mod tests {
 
         // milisecond precision lost for this: assert_eq!(task.deadline, deadline);
         let task = Task::insert(&mut conn, form).await.anonymize_error()?;
-        assert_eq!(task.failed_attempts, 0);
+        assert_eq!(task.attempts, 0);
         assert_eq!(task.periodic, false);
         assert_eq!(task.priority, TaskPriority::High);
         assert_eq!(task.status, TaskStatus::Queued);
@@ -239,7 +300,7 @@ mod tests {
 
         // milisecond precision lost for this: assert_eq!(task.deadline, deadline);
         let task = Task::insert(&mut conn, form).await.anonymize_error()?;
-        assert_eq!(task.failed_attempts, 0);
+        assert_eq!(task.attempts, 0);
         assert_eq!(task.periodic, true);
         assert_eq!(task.priority, TaskPriority::High);
         assert_eq!(task.status, TaskStatus::Queued);
@@ -256,7 +317,7 @@ mod tests {
         let new_deadline = Utc::now();
         let form = UpdateTaskForm::builder()
             .deadline(Some(new_deadline))
-            .failed_attempts(Some(2))
+            .attempts(Some(2))
             .priority(Some(TaskPriority::Low))
             .status(Some(TaskStatus::Failed))
             .build();
@@ -270,7 +331,7 @@ mod tests {
         // milisecond precision lost for this: assert_eq!(new_data.deadline, new_deadline);
         let new_data = new_data.unwrap();
         assert!(new_data.updated_at.is_some());
-        assert_eq!(new_data.failed_attempts, 2);
+        assert_eq!(new_data.attempts, 2);
         assert_eq!(new_data.priority, TaskPriority::Low);
         assert_eq!(new_data.status, TaskStatus::Failed);
 

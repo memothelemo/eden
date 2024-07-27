@@ -16,7 +16,7 @@ pub use eden_db::schema::{TaskPriority, TaskStatus};
 pub struct TaskPerformInfo {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
-    pub failed_attempts: i32,
+    pub attempts: i32,
     pub last_retry: Option<DateTime<Utc>>,
     pub is_retrying: bool,
 }

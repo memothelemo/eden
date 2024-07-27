@@ -17,7 +17,6 @@ pub struct PeriodicTask {
 
     // task running status
     deadline: Mutex<Option<DateTime<Utc>>>,
-    last_run_at: Mutex<Option<DateTime<Utc>>>,
 
     pub task_type: &'static str,
 }
@@ -37,7 +36,6 @@ impl PeriodicTask {
             schedule: T::schedule(),
 
             deadline: Mutex::new(None),
-            last_run_at: Mutex::new(None),
 
             task_type: T::task_type(),
         }
