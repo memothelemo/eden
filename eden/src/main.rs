@@ -1,4 +1,3 @@
-use eden_tasks::prelude::*;
 use eden_utils::error::ResultExt;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::str::FromStr;
@@ -6,57 +5,13 @@ use tracing::level_filters::LevelFilter;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt, Layer};
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(crate = "serde")]
-pub struct CleanupUsers;
-
-#[async_trait]
-impl Task for CleanupUsers {
-    type State = ();
-
-    fn task_type() -> &'static str
-    where
-        Self: Sized,
-    {
-        "cleanup-users"
-    }
-
-    fn schedule() -> TaskSchedule
-    where
-        Self: Sized,
-    {
-        TaskSchedule::interval(TimeDelta::seconds(10))
-    }
-
-    #[allow(clippy::unwrap_used)]
-    async fn perform(
-        &self,
-        _info: &TaskPerformInfo,
-        _state: Self::State,
-    ) -> eden_utils::Result<TaskResult> {
-        Ok(TaskResult::Completed)
-    }
-}
-
 #[allow(clippy::unnecessary_wraps, clippy::unwrap_used)]
 async fn bootstrap() -> eden_utils::Result<()> {
     let db_url = eden_utils::env::var("DATABASE_URL")?;
-    let pool = PgPoolOptions::new()
+    let _pool = PgPoolOptions::new()
         .connect_with(PgConnectOptions::from_str(&db_url).anonymize_error()?)
         .await
         .anonymize_error()?;
-
-    let queue = eden_tasks::Queue::builder()
-        .concurrency(25)
-        .periodic_poll_interval(TimeDelta::seconds(1))
-        .build(pool.clone(), ())
-        .register_task::<CleanupUsers>();
-
-    queue.clear_all().await?;
-    queue.start().await?;
-
-    eden_utils::shutdown_signal().await;
-    queue.shutdown().await;
 
     Ok(())
 }
