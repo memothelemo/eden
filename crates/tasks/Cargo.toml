@@ -21,6 +21,7 @@ sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util = { version = "0.7.11", features = ["full"] }
+tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]

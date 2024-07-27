@@ -40,10 +40,10 @@ sha2 = "0.10.8"
 # async related
 async-trait = "0.1.80"
 futures = "0.3.30"
-tokio = { version = "1.38.0", features = ["full"] }
+tokio = { version = "1.38.0", features = ["full", "tracing"] }
 
 # tracing/logging
-tracing = "0.1.40"
+tracing = { version = "0.1.40", features = ["log"] }
 tracing-error = "0.2.0"
 
 # twilight crates

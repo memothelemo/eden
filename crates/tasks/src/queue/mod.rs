@@ -4,7 +4,6 @@ use eden_db::forms::{InsertTaskForm, UpdateTaskForm};
 use eden_db::schema::{Task, TaskRawData, TaskStatus};
 use eden_utils::error::{AnyResultExt, ErrorExt, ResultExt};
 use eden_utils::{Error, ErrorCategory, Result};
-use futures::FutureExt;
 use serde::Serialize;
 use sqlx::{pool::PoolConnection, Transaction};
 use std::sync::Arc;
@@ -62,8 +61,12 @@ where
             .attach_printable("could not commit database transaction")?;
 
         // clear all blocked tasks if necessary and not running
-        for periodic_task in self.0.periodic_tasks.read().await.iter() {
-            periodic_task.set_blocked(false).await;
+        let tasks = self.0.periodic_tasks.read().await;
+        if !tasks.is_empty() {
+            tracing::debug!("unblocking all periodic tasks");
+            for periodic_task in tasks.iter() {
+                periodic_task.set_blocked(false).await;
+            }
         }
 
         Ok(deleted)
@@ -78,6 +81,8 @@ where
     /// It returns the total amount of tasks deleted from
     /// the database.
     pub async fn clear_all_with(&self, status: TaskStatus) -> Result<u64, ClearAllTasksError> {
+        tracing::info!(?status, "clearing all queued tasks with filtered status");
+
         let mut conn = self
             .db_transaction()
             .await
@@ -164,20 +169,17 @@ where
     /// to be terminated regardless of their result.
     #[allow(clippy::let_underscore_must_use)]
     pub async fn shutdown(&self) {
+        tracing::info!("shutting down background queue process");
+
         self.0.shutdown.cancel();
         self.0.running_tasks.close();
         self.0.running_tasks.wait().await;
-
-        // wait for the runner handle to be terminated as well
-        let mut handle = self.0.runner_handle.lock().await;
-        if let Some(handle) = handle.take() {
-            // TODO: log errors from handle
-            let _ = handle.await;
-        }
     }
 
     /// Processes incoming tasks indefinitely.
     pub async fn start(&self) -> Result<(), StartQueueError> {
+        tracing::info!("starting background queue process");
+
         let mut handle = self.0.runner_handle.lock().await;
         if handle.is_some() {
             return Err(Error::context(ErrorCategory::Unknown, StartQueueError))
@@ -196,7 +198,7 @@ where
             task.adjust_deadline(now).await;
         }
 
-        *handle = Some(tokio::spawn(runner::runner(self.clone())));
+        *handle = Some(tokio::spawn(runner::start(self.clone())));
         drop(handle);
 
         Ok(())
@@ -232,16 +234,17 @@ where
     }
 
     async fn update_periodic_tasks_blacklist(&self) -> Result<()> {
-        let mut conn = self.db_connection().await?;
+        tracing::debug!("updating blacklist of periodic tasks");
 
+        let mut conn = self.db_connection().await?;
         let mut stream = Task::get_all().periodic(true).build().size(50);
         while let Some(tasks) = stream.next(&mut conn).await.anonymize_error()? {
             for task in tasks {
                 if let Some(task) = self.get_periodic_task(&task.data.kind).await {
-                    eprintln!("{:?} is blocked", task.task_type);
+                    tracing::trace!("{:?} periodic task is blocked", task.task_type);
                     task.set_blocked(true).await;
                 } else {
-                    eprintln!("unknown periodic task: {:?}", task.data.kind);
+                    tracing::warn!("unknown periodic task: {:?}", task.data.kind);
                 }
             }
         }
@@ -335,18 +338,22 @@ where
     }
 
     /// Performs any task, regardless queued or periodic
+    #[tracing::instrument(skip_all, fields(
+        task.id = %perform_info.id,
+        task.created_at = %perform_info.created_at,
+        task.attempts = %perform_info.attempts,
+        task.deadline = %perform_info.deadline,
+        task.kind = %registry_meta.kind,
+        task.is_retrying = %perform_info.is_retrying,
+        task.periodic = %registry_meta.is_periodic,
+    ))]
     async fn perform_task(
         &self,
         task: &(dyn AnyTask<State = S> + 'static),
         perform_info: &TaskPerformInfo,
         registry_meta: &TaskRegistryMeta<S>,
     ) -> Result<PerformTaskAction, PerformTaskError> {
-        println!(
-            "running task {} ({}); data = {task:?}",
-            perform_info.id, registry_meta.kind
-        );
-
-        let task_future = task.perform(perform_info, self.0.state.clone()).boxed();
+        let task_future = task.perform(perform_info, self.0.state.clone());
         let task_future = CatchUnwindTaskFuture::new(task_future);
 
         let timeout = runner::resolve_time_delta(task.timeout())
@@ -356,6 +363,7 @@ where
             })
             .attach(PerformTaskAction::Delete)?;
 
+        tracing::debug!("performing task for {:?}", registry_meta.kind);
         let result = tokio::time::timeout(timeout, task_future)
             .await
             .change_context(PerformTaskError)
@@ -365,23 +373,30 @@ where
         let action = match result {
             Ok(TaskResult::Completed) => PerformTaskAction::Completed,
             Ok(TaskResult::RetryIn(n)) => PerformTaskAction::RetryIn(n),
-            Ok(TaskResult::Fail(n)) => {
-                eprintln!(
-                    "task {} with type {:?}; task got a fatal error: {n}",
-                    perform_info.id, registry_meta.kind,
+            Ok(TaskResult::Reject(error)) => {
+                tracing::warn!(
+                    error = %error,
+                    "task {:?} got a rejection error",
+                    registry_meta.kind,
                 );
                 PerformTaskAction::Delete
             }
             Err(error) => {
                 let error = error.anonymize();
-                eprintln!(
-                    "task {} with type {:?}; task got an error: {error}",
-                    perform_info.id, registry_meta.kind,
+                tracing::error!(
+                    error = %error,
+                    "task {:?} got an error",
+                    registry_meta.kind,
                 );
-                PerformTaskAction::RetryOnError
+                error
+                    .get_attached_any::<PerformTaskAction>()
+                    .next()
+                    .cloned()
+                    .unwrap_or(PerformTaskAction::RetryOnError)
             }
         };
 
+        tracing::debug!("done performing task for {:?}", registry_meta.kind);
         Ok(action)
     }
 

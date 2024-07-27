@@ -3,13 +3,11 @@ use eden_db::forms::UpdateTaskForm;
 use eden_db::schema::{Task, TaskRawData, TaskStatus};
 use eden_utils::error::{AnyResultExt, ErrorExt, ResultExt};
 use eden_utils::Result;
-use futures::FutureExt;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use thiserror::Error;
+use tracing::Instrument;
 use uuid::Uuid;
 
 use super::{periodic::PeriodicTask, PerformTaskAction, Queue};
@@ -23,10 +21,10 @@ impl<S> Queue<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    async fn perform_queued_task(&self, task_info: &Task) -> PerformTaskAction {
+    async fn perform_queued_task_inner(&self, task_info: &Task) -> PerformTaskAction {
         let Some(registry_meta) = self.0.registry.get(task_info.data.kind.as_str()) else {
-            eprintln!(
-                "Cannot find task registry metadata for {:?}, skipping...",
+            tracing::warn!(
+                "cannot find registry metadata for task {:?}",
                 task_info.data.kind
             );
             return PerformTaskAction::Delete;
@@ -35,6 +33,7 @@ where
         let perform_info = TaskPerformInfo {
             id: task_info.id,
             created_at: task_info.created_at,
+            deadline: task_info.deadline,
             attempts: task_info.attempts,
             last_retry: task_info.last_retry,
             is_retrying: task_info.attempts > 0,
@@ -43,10 +42,10 @@ where
         let task = match self.deserialize_task(&task_info.data, &registry_meta) {
             Ok(n) => n,
             Err(error) => {
-                eprintln!(
-                    "could not deserialize task ({:?}) {:#?}",
-                    task_info.data.kind,
-                    error.anonymize()
+                tracing::warn!(
+                    error = %error.anonymize(),
+                    "could not deserialize task for {:?}",
+                    task_info.data.kind
                 );
                 return PerformTaskAction::Delete;
             }
@@ -60,11 +59,11 @@ where
             Ok(action) => action,
             Err(error) => {
                 let error = error.anonymize();
-                eprintln!(
-                    "task {} with type {:?}; task failed: {error:#?}",
-                    perform_info.id, registry_meta.kind,
+                tracing::warn!(
+                    error = %error,
+                    "failed to perform task for {:?}",
+                    task_info.data.kind,
                 );
-
                 error
                     .get_attached_any()
                     .next()
@@ -78,10 +77,86 @@ where
         match action {
             PerformTaskAction::RetryOnError | PerformTaskAction::RetryOnTimedOut => {
                 let attempts = u16::try_from(task_info.attempts).unwrap_or_else(|_| 0);
-
                 PerformTaskAction::RetryIn(task.backoff(attempts + 1))
             }
             _ => action,
+        }
+    }
+
+    async fn perform_queued_task(&self, task: Task) {
+        let max_attempts = self.0.config.max_attempts as i32;
+        let action = self.perform_queued_task_inner(&task).await;
+
+        let mut conn = match self.db_connection().await {
+            Ok(conn) => conn,
+            Err(error) => {
+                tracing::warn!(
+                    error = %error,
+                    "could not establish database connection for task {:?}",
+                    task.data.kind,
+                );
+                return;
+            }
+        };
+
+        let now = Utc::now();
+        let result = match action {
+            PerformTaskAction::Delete => {
+                tracing::debug!("deleted task for {:?}", task.data.kind);
+                Task::delete(&mut conn, task.id)
+                    .await
+                    .map(|_| ())
+                    .anonymize_error()
+            }
+            PerformTaskAction::Completed => {
+                tracing::debug!("completed task for {:?}", task.data.kind);
+
+                let form = UpdateTaskForm::builder()
+                    .status(Some(TaskStatus::Success))
+                    .build();
+
+                Task::update(&mut conn, task.id, form)
+                    .await
+                    .map(|_| ())
+                    .anonymize_error()
+            }
+            PerformTaskAction::RetryIn(delta) => {
+                let total_attempts = task.attempts + 1;
+                if total_attempts > max_attempts {
+                    tracing::debug!(
+                        "task {:?} received too many attempts; failing task",
+                        task.data.kind,
+                    );
+                    Task::fail(&mut conn, task.id)
+                        .await
+                        .map(|_| ())
+                        .anonymize_error()
+                } else {
+                    tracing::debug!("retrying task {:?} for {delta:?}", task.data.kind,);
+                    self.requeue(task.id, Scheduled::In(delta), Some(now), task.attempts + 1)
+                        .await
+                        .anonymize_error()
+                }
+            }
+            PerformTaskAction::RetryOnError | PerformTaskAction::RetryOnTimedOut => unreachable!(),
+        };
+
+        if let Err(error) = result {
+            tracing::warn!(
+                %error,
+                "task {:?} failed to perform post-perform operation",
+                task.data.kind
+            );
+            return;
+        }
+
+        // Unblock if it is a periodic task
+        if let Some(periodic_task) = self.get_periodic_task(&task.data.kind).await {
+            tracing::warn!(
+                "task {:?} is a periodic task. allowing task to run periodically",
+                task.data.kind
+            );
+            periodic_task.set_blocked(false).await;
         }
     }
 
@@ -104,7 +179,12 @@ where
         )
         .await
         .change_context(RunPendingQueuedTaskError)?;
-        println!("requeued {stalled_tasks} stalled tasks");
+
+        if stalled_tasks > 0 {
+            tracing::debug!("requeued {stalled_tasks} stalled tasks");
+        } else {
+            tracing::trace!("requeued {stalled_tasks} stalled tasks");
+        }
 
         let mut stream = Task::pull_all_pending(max_attempts, Some(ticked_at)).size(50);
         while let Some(tasks) = stream
@@ -114,82 +194,17 @@ where
         {
             for task in tasks {
                 let queue_tx = self.clone();
-                self.spawn_fut(async move {
-                    let action = queue_tx.perform_queued_task(&task).await;
-
-                    let mut conn = match queue_tx.db_connection().await {
-                        Ok(conn) => conn,
-                        Err(error) => {
-                            eprintln!(
-                                "task {} with type {:?}; could not establish database connection: {error:#?}",
-                                task.id, task.data.kind
-                            );
-                            return;
-                        }
-                    };
-
-                    let now = Utc::now();
-                    let result = match action {
-                        PerformTaskAction::Delete => {
-                            eprintln!(
-                                "task {} with type {:?}; deleting task",
-                                task.id, task.data.kind
-                            );
-                            Task::delete(&mut conn, task.id).await.map(|_| ())
-                                .anonymize_error()
-                        },
-                        PerformTaskAction::Completed => {
-                            eprintln!(
-                                "task {} with type {:?}; task completed",
-                                task.id, task.data.kind
-                            );
-
-                            let form = UpdateTaskForm::builder()
-                                .status(Some(TaskStatus::Success))
-                                .build();
-
-                            Task::update(&mut conn, task.id, form).await.map(|_| ())
-                                .anonymize_error()
-                        },
-                        PerformTaskAction::RetryIn(delta) => {
-                            let total_attempts = task.attempts + 1;
-                            if total_attempts > max_attempts {
-                                eprintln!(
-                                    "task {} with type {:?}; task failed, exceeded maximum of retries",
-                                    task.id, task.data.kind
-                                );
-                                Task::fail(&mut conn, task.id).await.map(|_| ())
-                                    .anonymize_error()
-                            } else {
-                                eprintln!(
-                                    "task {} with type {:?}; retrying task in {delta}",
-                                    task.id, task.data.kind
-                                );
-                                queue_tx.requeue(task.id, Scheduled::In(delta), Some(now), task.attempts + 1)
-                                    .await
-                                    .anonymize_error()
-                            }
-                        },
-                        PerformTaskAction::RetryOnError | PerformTaskAction::RetryOnTimedOut => unreachable!(),
-                    };
-
-                    if let Err(error) = result {
-                        eprintln!(
-                            "task {} with type {:?}; failed to perform post-operation task: {error}",
-                            task.id, task.data.kind
-                        );
-                        return;
-                    }
-
-                    // Unblock if it is a periodic task
-                    if let Some(periodic_task) = queue_tx.get_periodic_task(&task.data.kind).await {
-                        eprintln!(
-                            "periodic task {} with type {:?}; unblocking task",
-                            task.id, task.data.kind
-                        );
-                        periodic_task.set_blocked(false).await;
-                    }
-                });
+                let span = tracing::info_span!(
+                    "perform_queued_task",
+                    task.id = %task.id,
+                    task.created_at = %task.created_at,
+                    task.deadline = %task.deadline,
+                    task.periodic = %task.periodic,
+                    task.attempts = %task.attempts,
+                    "task.type" = %task.data.kind
+                );
+                let fut = async move { queue_tx.perform_queued_task(task).instrument(span).await };
+                self.spawn_fut(fut);
             }
         }
 
@@ -201,10 +216,11 @@ impl<S> Queue<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    async fn perform_periodic_task(&self, ticked_at: DateTime<Utc>, task: &PeriodicTask) {
+    #[tracing::instrument(skip_all)]
+    async fn perform_periodic_task(&self, ticked_at: DateTime<Utc>, task: Arc<PeriodicTask>) {
         let Some(registry_meta) = self.0.registry.get(task.task_type) else {
             panic!(
-                "Cannot find task registry metadata for {:?}",
+                "Cannot find task registry metadata for periodic task {:?}",
                 task.task_type
             );
         };
@@ -215,6 +231,7 @@ where
         let perform_info = TaskPerformInfo {
             id: fake_queued_task_id,
             created_at: ticked_at,
+            deadline: task.deadline().await.unwrap_or(ticked_at),
             attempts: 0,
             last_retry: None,
             is_retrying: false,
@@ -225,6 +242,33 @@ where
             inner: serde_json::Value::Null,
         };
 
+        // Don't forget to record this, these are already created
+        let span = tracing::Span::current();
+        if !span.is_disabled() {
+            span.record("task.id", tracing::field::display(&perform_info.id));
+            span.record(
+                "task.created_at",
+                tracing::field::display(&perform_info.created_at),
+            );
+            span.record(
+                "task.attempts",
+                tracing::field::display(&perform_info.attempts),
+            );
+            span.record(
+                "task.deadline",
+                tracing::field::display(&perform_info.deadline),
+            );
+            span.record("task.kind", tracing::field::display(registry_meta.kind));
+            span.record(
+                "task.is_retrying",
+                tracing::field::display(perform_info.is_retrying),
+            );
+            span.record(
+                "task.periodic",
+                tracing::field::display(registry_meta.is_periodic),
+            );
+        }
+
         let deserialized_task = match self.deserialize_task(&raw_data, &registry_meta) {
             Ok(n) => n,
             Err(error) => {
@@ -233,7 +277,7 @@ where
                     .anonymize();
 
                 panic!(
-                    "could not deserialize task ({:?}) {error:#?}",
+                    "could not deserialize periodic task ({:?}) {error:#?}",
                     registry_meta.kind
                 );
             }
@@ -247,9 +291,10 @@ where
             Ok(action) => action,
             Err(error) => {
                 let error = error.anonymize();
-                eprintln!(
-                    "task {} with type {:?}; task failed: {error:#?}",
-                    perform_info.id, registry_meta.kind,
+                tracing::warn!(
+                    error = %error,
+                    "failed to perform periodic task for {:?}",
+                    registry_meta.kind,
                 );
 
                 error
@@ -286,26 +331,25 @@ where
             .await;
 
         if let Err(error) = queue_result {
-            eprintln!(
-                "task {} with type {:?}; could not queue periodic task: {:#?}",
-                perform_info.id,
+            tracing::warn!(
+                error = %error.anonymize(),
+                "could not queue periodic task for {:?}",
                 registry_meta.kind,
-                error.anonymize()
             );
         } else {
-            eprintln!(
-                "task {} with type {:?}; queued for {retry_in}",
-                perform_info.id, registry_meta.kind,
+            tracing::debug!(
+                "queued periodic task {:?} for {retry_in}",
+                registry_meta.kind,
             );
             task.set_blocked(true).await;
-            task.set_running(false);
         }
+        task.set_running(false);
     }
 
     async fn run_pending_periodic_tasks(&self, ticked_at: DateTime<Utc>) {
         // FIXME: It is not a good idea to have a list of tasks
         //        needed to run then sort them out with their priorities
-        let mut unsorted_futures = Vec::new();
+        let mut sorted_tasks = Vec::new();
         let tasks = self.0.periodic_tasks.read().await.to_vec();
         for task in tasks.iter() {
             let should_not_run = task.is_blocked().await || task.is_running();
@@ -321,18 +365,16 @@ where
                 continue;
             }
 
-            let queue_tx = self.clone();
-            let task_tx = task.clone();
-            let future =
-                async move { queue_tx.perform_periodic_task(ticked_at, &task_tx).await }.boxed();
-
-            unsorted_futures.push((task.priority(), future));
+            sorted_tasks.push(task.clone());
         }
 
         // sort tasks needed to run based on their priority
-        unsorted_futures.sort_by(|a, b| a.0.cmp(&b.0));
-        for entry in unsorted_futures {
-            self.spawn_fut(entry.1);
+        sorted_tasks.sort_by(|a, b| a.priority().cmp(&b.priority()));
+
+        for task in sorted_tasks {
+            let queue_tx = self.clone();
+            let fut = async move { queue_tx.perform_periodic_task(ticked_at, task).await };
+            self.spawn_fut(fut);
         }
     }
 }
@@ -342,11 +384,13 @@ pub fn resolve_time_delta(delta: TimeDelta) -> Option<StdDuration> {
     delta.to_std().or_else(|_| delta.abs().to_std()).ok()
 }
 
-// the main loop for queue
-pub async fn runner<S>(queue: Queue<S>)
+// the main loop for periodic tasks
+pub async fn start<S>(queue: Queue<S>)
 where
     S: Clone + Send + Sync + 'static,
 {
+    tracing::debug!("spawned runner thread");
+
     // this is prevent from Eden's scheduler system to request
     // from the database multiple times. run them one at a time
     let queue_poll_duration = resolve_time_delta(queue.0.config.queue_poll_interval)
@@ -361,9 +405,10 @@ where
 
     // TODO: wait a bit longer if run_pending_queue_tasks fails
     loop {
+        tracing::trace!("runner loop started");
+
         let now = Utc::now();
         let shutdown = queue.0.shutdown.cancelled();
-
         tokio::select! {
             _ = periodic_interval.tick() => {
                 queue.run_pending_periodic_tasks(now).await;
@@ -380,15 +425,17 @@ where
                 queue.spawn_fut(async move {
                     queue_locked_tx.store(true, Ordering::SeqCst);
                     if let Err(error) = queue_tx.run_pending_queued_tasks(now).await {
-                        eprintln!("running all pending queued tasks failed: {}", error.anonymize());
+                        tracing::warn!(error = %error.anonymize(), "failed to run all pending queued tasks");
                     }
                     queue_locked_tx.store(false, Ordering::SeqCst);
                 });
             },
             () = shutdown => {
-                eprintln!("requested shutdown");
+                tracing::debug!("requested shutdown from queue. closing runner thread...");
                 return;
             },
         }
+
+        tracing::trace!("runner loop ended");
     }
 }

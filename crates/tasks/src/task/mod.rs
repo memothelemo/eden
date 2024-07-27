@@ -16,6 +16,7 @@ pub use eden_db::schema::{TaskPriority, TaskStatus};
 pub struct TaskPerformInfo {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
+    pub deadline: DateTime<Utc>,
     pub attempts: i32,
     pub last_retry: Option<DateTime<Utc>>,
     pub is_retrying: bool,
@@ -99,12 +100,12 @@ pub trait Task: Debug + Send + Sync + 'static {
 pub enum TaskResult {
     /// The task has completed its task.
     Completed,
-    /// The task has encountered a fatal error and should not
+    /// The task has encountered a rejected error and should not
     /// be tried again.
     ///
     /// If the task running encountered this fatal error, it will
     /// not attempt to any backoffs.
-    Fail(eden_utils::Error),
+    Reject(eden_utils::Error),
     /// The task will try to run again in the future within
     /// the given duration. This attempt will be counted to the
     /// total number of consecutive retries.

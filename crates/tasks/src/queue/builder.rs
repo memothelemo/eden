@@ -2,7 +2,8 @@ use super::{Queue, QueueConfig, QueueInner};
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 
 pub struct BuilderState;
 

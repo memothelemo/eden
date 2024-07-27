@@ -15,5 +15,10 @@ sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
+tracing.workspace = true
+tracing-error.workspace = true
+tracing-log = "0.2.0"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
 [lints]
 workspace = true

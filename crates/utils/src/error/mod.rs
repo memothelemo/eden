@@ -153,6 +153,15 @@ impl Error {
     }
 }
 
+impl Error {
+    pub fn init() {
+        use error_stack::fmt::{Charset, ColorMode};
+
+        error_stack::Report::set_charset(Charset::Ascii);
+        error_stack::Report::set_color_mode(ColorMode::None);
+    }
+}
+
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Error")
