@@ -99,12 +99,12 @@ mod tests {
 
         let mut stream = Paginated::new(GetAllTasks::new().periodic(true)).size(3);
         while let Some(data) = stream.next(&mut conn).await.anonymize_error()? {
-            assert!(data.iter().all(|v| v.periodic == true));
+            assert!(data.iter().all(|v| v.periodic));
         }
 
         let mut stream = Paginated::new(GetAllTasks::new().periodic(false)).size(3);
         while let Some(data) = stream.next(&mut conn).await.anonymize_error()? {
-            assert!(data.iter().all(|v| v.periodic == false));
+            assert!(data.iter().all(|v| !v.periodic));
         }
 
         Ok(())

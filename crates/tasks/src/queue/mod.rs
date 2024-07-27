@@ -336,7 +336,7 @@ where
         let deadline = scheduled.timestamp(now);
         let priority = (*registry_meta.priority)();
         if registry_meta.is_periodic {
-            if let Some(task) = self.get_periodic_task(&registry_meta.kind).await {
+            if let Some(task) = self.get_periodic_task(registry_meta.kind).await {
                 task.set_blocked(true).await;
             }
         }
@@ -417,7 +417,7 @@ where
                 error
                     .get_attached_any::<PerformTaskAction>()
                     .next()
-                    .cloned()
+                    .copied()
                     .unwrap_or(PerformTaskAction::RetryOnError)
             }
         };

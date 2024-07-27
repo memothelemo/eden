@@ -134,7 +134,6 @@ impl<T: Context> Error<T> {
         self.report.request_ref::<T>().next().is_some()
     }
 
-    #[must_use]
     pub fn get_attached<N>(&self) -> RequestRef<'_, N>
     where
         N: ?Sized + Send + Sync + 'static,
@@ -144,7 +143,6 @@ impl<T: Context> Error<T> {
 }
 
 impl Error {
-    #[must_use]
     pub fn get_attached_any<N>(&self) -> RequestRef<'_, N>
     where
         N: ?Sized + Send + Sync + 'static,

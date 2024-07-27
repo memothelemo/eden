@@ -87,7 +87,7 @@ where
                 error
                     .get_attached_any()
                     .next()
-                    .cloned()
+                    .copied()
                     .unwrap_or(PerformTaskAction::RetryOnError)
             }
         };
@@ -99,14 +99,16 @@ where
         // we cannot access the deserialized task anymore
         match action {
             PerformTaskAction::RetryOnError | PerformTaskAction::RetryOnTimedOut => {
-                let attempts = u16::try_from(task_info.attempts).unwrap_or_else(|_| 0);
+                let attempts = u16::try_from(task_info.attempts).unwrap_or(0);
                 PerformTaskAction::RetryIn(task.backoff(attempts + 1))
             }
             _ => action,
         }
     }
 
+    #[allow(clippy::cast_lossless)]
     async fn perform_queued_task(&self, task: Task) {
+        // not much data is lost if converted from u16 to i32
         let max_attempts = self.0.config.max_attempts as i32;
         let action = self.perform_queued_task_inner(&task).await;
 
@@ -183,6 +185,7 @@ where
         }
     }
 
+    #[allow(clippy::cast_lossless)]
     async fn run_pending_queued_tasks(
         &self,
         ticked_at: DateTime<Utc>,
@@ -328,7 +331,7 @@ where
                 error
                     .get_attached_any()
                     .next()
-                    .cloned()
+                    .copied()
                     .unwrap_or(PerformTaskAction::RetryOnError)
             }
         };
@@ -383,7 +386,7 @@ where
         //        needed to run then sort them out with their priorities
         let mut sorted_tasks = Vec::new();
         let tasks = self.0.periodic_tasks.read().await.to_vec();
-        for task in tasks.iter() {
+        for task in &tasks {
             let should_not_run = task.is_blocked().await || task.is_running();
             if should_not_run {
                 continue;
@@ -401,7 +404,7 @@ where
         }
 
         // sort tasks needed to run based on their priority
-        sorted_tasks.sort_by(|a, b| a.priority().cmp(&b.priority()));
+        sorted_tasks.sort_by_key(|a| a.priority());
 
         for task in sorted_tasks {
             let queue_tx = self.clone();

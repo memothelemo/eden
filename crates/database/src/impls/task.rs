@@ -274,7 +274,7 @@ mod tests {
         // milisecond precision lost for this: assert_eq!(task.deadline, deadline);
         let task = Task::insert(&mut conn, form).await.anonymize_error()?;
         assert_eq!(task.attempts, 0);
-        assert_eq!(task.periodic, false);
+        assert!(!task.periodic);
         assert_eq!(task.priority, TaskPriority::High);
         assert_eq!(task.status, TaskStatus::Queued);
         assert_eq!(task.data, data);
@@ -301,7 +301,7 @@ mod tests {
         // milisecond precision lost for this: assert_eq!(task.deadline, deadline);
         let task = Task::insert(&mut conn, form).await.anonymize_error()?;
         assert_eq!(task.attempts, 0);
-        assert_eq!(task.periodic, true);
+        assert!(task.periodic);
         assert_eq!(task.priority, TaskPriority::High);
         assert_eq!(task.status, TaskStatus::Queued);
         assert_eq!(task.data, data);
