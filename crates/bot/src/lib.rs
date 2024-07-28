@@ -21,6 +21,8 @@ const INTENTS: Intents = Intents::GUILDS;
 
 pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
     let bot = Bot::new(settings);
+    bot.test_db_pool().await.transform_context(StartBotError)?;
+
     let shards = create_shards(&bot)
         .await
         .attach_printable("could not create shards")?;

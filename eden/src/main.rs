@@ -6,14 +6,15 @@ use eden_utils::error::ResultExt;
 #[allow(clippy::unnecessary_wraps, clippy::unwrap_used, clippy::unused_async)]
 async fn bootstrap(settings: Settings) -> eden_utils::Result<()> {
     let settings = std::sync::Arc::new(settings);
-    let (_, bot) = tokio::join!(
-        eden_utils::shutdown::catch_signals(),
-        tokio::spawn(eden_bot::start(settings))
-    );
+    let result = tokio::try_join!(eden_bot::start(settings), async {
+        eden_utils::shutdown::catch_signals().await;
+        Ok(())
+    });
 
-    bot.change_context(StartBotError)
-        .attach_printable("thread got crashed")
-        .flatten()?;
+    result
+        .map(|(_, bot)| bot)
+        .change_context(StartBotError)
+        .attach_printable("failed to process threads")?;
 
     Ok(())
 }

@@ -1,4 +1,6 @@
 use eden_tasks::Queue;
+use eden_utils::error::{AnyResultExt, ResultExt};
+use eden_utils::Result;
 use once_cell::sync::OnceCell;
 use sqlx::postgres::PgPoolOptions;
 use std::{fmt::Debug, mem::MaybeUninit, ops::Deref, sync::Arc};
@@ -68,6 +70,20 @@ impl Bot {
         }
 
         bot
+    }
+}
+
+impl Bot {
+    pub async fn test_db_pool(&self) -> Result<()> {
+        tracing::debug!("testing database pool...");
+
+        match self.0.pool.acquire().await {
+            Ok(..) => Ok(()),
+            Err(error) if error.as_database_error().is_none() => Err(error)
+                .anonymize_error()
+                .attach_printable("database is unhealthy"),
+            Err(error) => Err(error).anonymize_error(),
+        }
     }
 }
 
