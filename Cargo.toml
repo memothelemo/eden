@@ -27,7 +27,7 @@ uuid = { version = "1.10.0", features = ["serde", "v4"] }
 error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "f52d870" }
 
 # macros
-paste = "*"
+paste = "1.0.15"
 thiserror = "1.0.61"
 
 # user configuration

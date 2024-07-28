@@ -10,16 +10,19 @@ use crate::error::SettingsLoadError;
 
 mod bot;
 mod database;
+mod logging;
 mod queue;
 
 pub use self::bot::*;
 pub use self::database::*;
+pub use self::logging::*;
 pub use self::queue::*;
 
 #[derive(Debug, Document, Deserialize)]
 pub struct Settings {
     pub(crate) bot: Bot,
     pub(crate) database: Database,
+    pub(crate) logging: Logging,
     pub(crate) queue: Queue,
 }
 
@@ -105,6 +108,11 @@ impl Settings {
     }
 
     #[must_use]
+    pub fn logging(&self) -> &Logging {
+        &self.logging
+    }
+
+    #[must_use]
     pub fn queue(&self) -> &Queue {
         &self.queue
     }
@@ -134,6 +142,13 @@ impl Settings {
             builder = builder
                 .set_default("bot.token", token)
                 .attach_printable("could not override settings for bot token")?;
+        }
+
+        // `RUST_LOG` usage
+        if let Some(value) = eden_utils::env::var_opt("RUST_LOG")? {
+            builder = builder
+                .set_override("logging.targets", value)
+                .attach_printable("could not override settings for RUST_LOG")?;
         }
 
         Ok(builder)

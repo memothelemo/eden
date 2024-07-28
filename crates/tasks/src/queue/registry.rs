@@ -58,6 +58,7 @@ where
             T::task_type()
         );
 
+        tracing::trace!("registered task {:?}", T::task_type());
         let deserializer: DeserializerFn<S> = Box::new(|value| {
             let task: T = serde_json::from_value(value)?;
             Ok(Box::new(task))

@@ -46,14 +46,17 @@ impl Bot {
             .queue_poll_interval(settings.queue.polling.queue);
 
         // SAFETY: The bot object (state for the queue object) will not be
-        //         accessed when Queue::builder().build() is called.
+        //         used when Queue::builder().build() is called and registered
+        //         all required tasks with 'crate::tasks::register_all_tasks'.
         //
         //         The inner value of the Bot object will be eventually replaced
         //         since we want to have queue obect stored with `Bot` as its state
         //         at the same time keep the queue inside the Bot object.
         let inner_uninit = Arc::new_zeroed();
         let bot = Bot(unsafe { inner_uninit.clone().assume_init() });
+
         let queue = queue.build(pool.clone(), bot.clone());
+        let queue = crate::tasks::register_all_tasks(queue);
         unsafe {
             let inner = &mut *(Arc::as_ptr(&inner_uninit) as *mut MaybeUninit<BotInner>);
             inner.write(BotInner {

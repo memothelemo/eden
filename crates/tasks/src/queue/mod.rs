@@ -178,7 +178,7 @@ where
         loop {
             let running_tasks = self.0.running_tasks.load(Ordering::SeqCst);
             if running_tasks == 0 {
-                tracing::info!("all task(s) finished");
+                tracing::info!("all task(s) are finished");
                 break;
             }
             tracing::info!("waiting for {running_tasks} task(s) to finish");

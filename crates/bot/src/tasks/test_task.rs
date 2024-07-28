@@ -2,24 +2,29 @@ use async_trait::async_trait;
 use eden_tasks::{Task, TaskPerformInfo, TaskResult};
 use eden_utils::Result;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use crate::Bot;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct BillPayer;
+pub struct TestTask;
 
 #[async_trait]
-impl Task for BillPayer {
+impl Task for TestTask {
     type State = Bot;
 
     fn task_type() -> &'static str
     where
         Self: Sized,
     {
-        "bill_payer"
+        "test_task"
     }
 
     async fn perform(&self, _info: &TaskPerformInfo, _state: Self::State) -> Result<TaskResult> {
-        todo!()
+        tracing::info!("sleeping...");
+        tokio::time::sleep(Duration::from_secs(10)).await;
+
+        tracing::info!("good morning!");
+        Ok(TaskResult::Completed)
     }
 }

@@ -468,7 +468,7 @@ where
                 });
             },
             () = shutdown => {
-                tracing::debug!("requested shutdown from queue. closed runner thread...");
+                tracing::debug!("requested shutdown from queue. closing runner thread...");
                 return;
             },
         }
