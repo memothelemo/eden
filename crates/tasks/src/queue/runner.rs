@@ -207,7 +207,7 @@ where
         .change_context(RunPendingQueuedTaskError)?;
 
         if stalled_tasks > 0 {
-            tracing::debug!("requeued {stalled_tasks} stalled tasks");
+            tracing::warn!("requeued {stalled_tasks} stalled tasks");
         } else {
             tracing::trace!("requeued {stalled_tasks} stalled tasks");
         }
@@ -424,7 +424,7 @@ pub async fn start<S>(queue: Queue<S>)
 where
     S: Clone + Send + Sync + 'static,
 {
-    tracing::debug!("spawned runner thread");
+    tracing::info!("started background queue process");
 
     // this is prevent from Eden's scheduler system to request
     // from the database multiple times. run them one at a time

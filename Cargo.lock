@@ -680,6 +680,8 @@ dependencies = [
  "dotenvy",
  "error-stack",
  "fundu",
+ "once_cell",
+ "pin-project-lite",
  "serde",
  "serde_with",
  "sha2",
@@ -687,6 +689,8 @@ dependencies = [
  "strum_macros",
  "thiserror",
  "tokio",
+ "tokio-util",
+ "tracing",
  "tracing-error",
 ]
 

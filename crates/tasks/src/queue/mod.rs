@@ -184,15 +184,15 @@ where
             tracing::info!("waiting for {running_tasks} task(s) to finish");
 
             let notify = self.0.running_tasks_notify.notified();
-            let stop_signal = eden_utils::shutdown_signal();
+            let aborted = eden_utils::shutdown::aborted();
             tokio::select! {
                 () = notify => {},
-                () = stop_signal => {
-                    tracing::warn!("shutdown signal triggered. aborting all running task(s)");
+                () = aborted => {
+                    tracing::warn!("aborting all running task(s)");
                     abort = true;
                     break;
-                },
-            };
+                }
+            }
         }
 
         // Wait for all futures to finally ended, if not aborted
@@ -204,7 +204,7 @@ where
 
     /// Processes incoming tasks indefinitely.
     pub async fn start(&self) -> Result<(), StartQueueError> {
-        tracing::info!("starting background queue process");
+        tracing::debug!("starting background queue process");
 
         let mut handle = self.0.runner_handle.lock().await;
         if handle.is_some() {

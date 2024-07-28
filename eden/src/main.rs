@@ -1,16 +1,19 @@
-use eden_bot::{Bot, Settings};
+use eden_bot::Settings;
+use eden_tasks::Scheduled;
 
 mod diagnostics;
 
 #[allow(clippy::unnecessary_wraps, clippy::unwrap_used, clippy::unused_async)]
 async fn bootstrap(settings: Settings) -> eden_utils::Result<()> {
-    let bot = Bot::new(settings);
-    println!("{bot:#?}");
-
+    let bot = eden_bot::Bot::new(settings);
     bot.queue.clear_all().await?;
     bot.queue.start().await?;
 
-    eden_utils::shutdown_signal().await;
+    bot.queue
+        .schedule(eden_bot::tasks::TestTask, Scheduled::in_seconds(3))
+        .await?;
+
+    eden_utils::shutdown::catch_signals().await;
     bot.queue.shutdown().await;
 
     Ok(())
