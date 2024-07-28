@@ -25,6 +25,19 @@ pub struct Error<T = AnonymizedError> {
 
 impl Error {
     #[track_caller]
+    pub fn unknown<T>(error: T) -> Self
+    where
+        T: std::error::Error,
+    {
+        Self {
+            category: ErrorCategory::Unknown,
+            report: AnyError::report(error),
+            trace: SpanTrace::capture(),
+            _phantom: PhantomData,
+        }
+    }
+
+    #[track_caller]
     pub fn any<T>(category: ErrorCategory, error: T) -> Self
     where
         T: std::error::Error,

@@ -25,5 +25,9 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing-error.workspace = true
 
+[build-dependencies]
+anyhow = "1.0.86"
+vergen-git2 = "1.0.0"
+
 [lints]
 workspace = true

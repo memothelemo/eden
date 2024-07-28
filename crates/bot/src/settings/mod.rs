@@ -4,7 +4,7 @@ use eden_utils::env::var_opt_parsed;
 use eden_utils::error::{AnyResultExt, ResultExt};
 use eden_utils::{Result as EdenResult, Suggestion};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::error::SettingsLoadError;
 
@@ -24,6 +24,9 @@ pub struct Settings {
     pub(crate) database: Database,
     pub(crate) logging: Logging,
     pub(crate) queue: Queue,
+    #[serde(skip)]
+    #[doku(skip)]
+    pub(crate) path: Option<PathBuf>,
 }
 
 impl Settings {
@@ -48,11 +51,14 @@ impl Settings {
             .transform_context(SettingsLoadError)
             .attach_printable("could not resolve settings path")?;
 
-        builder
+        let mut settings: Settings = builder
             .build()
             .change_context(SettingsLoadError)
             .and_then(|v| v.try_deserialize().change_context(SettingsLoadError))
-            .attach_printable_lazy(|| format!("loaded settings file from: {resolved_path:?}"))
+            .attach_printable_lazy(|| format!("loaded settings file from: {resolved_path:?}"))?;
+
+        settings.path = resolved_path;
+        Ok(settings)
     }
 
     const ALTERNATIVE_FILE_PATHS: &[&'static str] = &[
@@ -115,6 +121,11 @@ impl Settings {
     #[must_use]
     pub fn queue(&self) -> &Queue {
         &self.queue
+    }
+
+    #[must_use]
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
     }
 }
 

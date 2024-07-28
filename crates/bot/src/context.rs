@@ -14,7 +14,7 @@ pub struct Bot(Arc<BotInner>);
 
 impl Bot {
     #[allow(clippy::unwrap_used)]
-    pub fn new(settings: Settings) -> Self {
+    pub fn new(settings: Arc<Settings>) -> Self {
         let mut http = HttpClient::builder()
             .timeout(settings.bot.http.timeout)
             .token(settings.bot.token.as_str().into());
@@ -29,7 +29,6 @@ impl Bot {
         }
 
         let http = Arc::new(http.build());
-        let settings = Arc::new(settings);
         let pool = PgPoolOptions::new()
             .idle_timeout(settings.database.idle_timeout)
             .acquire_timeout(settings.database.connect_timeout)

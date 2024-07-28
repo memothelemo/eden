@@ -1,6 +1,6 @@
 [package]
 name = "eden-bot"
-description = "The actual implementation of Eden, the Discord bot."
+description = "Eden's implementation of its Discord bot."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -15,6 +15,7 @@ eden-utils.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 fancy-duration.workspace = true
+futures.workspace = true
 once_cell.workspace = true
 rust_decimal.workspace = true
 serde.workspace = true
@@ -22,6 +23,7 @@ serde_with.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 tracing.workspace = true
 
 config = { version = "0.14.0", features = ["convert-case", "preserve_order", "toml"], default-features = false }

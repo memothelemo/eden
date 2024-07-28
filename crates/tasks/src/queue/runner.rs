@@ -27,9 +27,7 @@ where
     /// the queue's semaphore's permits reach the maximum concurrent threads.
     async fn permit_process_task(&self) -> Option<SemaphorePermit<'_>> {
         if self.0.semaphore.available_permits() == 0 {
-            tracing::debug!(
-                "queue semaphore ran out of permits, waiting for task(s) to be finished"
-            );
+            tracing::debug!("queue semaphore ran out of permits, waiting for task(s) to finish");
         }
 
         let result = self.0.semaphore.acquire().await.ok();
@@ -424,7 +422,8 @@ pub async fn start<S>(queue: Queue<S>)
 where
     S: Clone + Send + Sync + 'static,
 {
-    tracing::info!("started background queue process");
+    let max_tasks = queue.0.config.concurrency;
+    tracing::info!("started background queue process with {max_tasks} max running tasks");
 
     // this is prevent from Eden's scheduler system to request
     // from the database multiple times. run them one at a time

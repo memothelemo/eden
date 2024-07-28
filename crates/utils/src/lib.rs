@@ -2,6 +2,7 @@ mod internal;
 mod sensitive;
 mod suggestion;
 
+pub mod build;
 pub mod env;
 pub mod error;
 pub mod hash;

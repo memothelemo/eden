@@ -16,6 +16,7 @@ sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
+nu-ansi-term = "0.50.1"
 tracing.workspace = true
 tracing-error.workspace = true
 tracing-log = "0.2.0"
