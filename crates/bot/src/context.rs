@@ -4,8 +4,10 @@ use eden_utils::Result;
 use once_cell::sync::OnceCell;
 use sqlx::postgres::PgPoolOptions;
 use std::{fmt::Debug, mem::MaybeUninit, ops::Deref, sync::Arc};
+use twilight_http::client::InteractionClient;
 use twilight_http::Client as HttpClient;
 
+use crate::error::UninitAppIdError;
 use crate::Settings;
 
 /// It holds the main components of the application such as
@@ -23,11 +25,6 @@ impl Bot {
 
         if let Some(proxy) = settings.bot.http.proxy.as_ref() {
             http = http.proxy(proxy.as_str().into(), settings.bot.http.proxy_use_http);
-        }
-
-        let application_id = OnceCell::new();
-        if let Some(id) = settings.bot.application_id {
-            application_id.set(id).unwrap();
         }
 
         let http = Arc::new(http.build());
@@ -61,7 +58,7 @@ impl Bot {
         unsafe {
             let inner = &mut *(Arc::as_ptr(&inner_uninit) as *mut MaybeUninit<BotInner>);
             inner.write(BotInner {
-                application_id,
+                application_id: OnceCell::new(),
                 http,
                 pool,
                 queue,
@@ -74,6 +71,16 @@ impl Bot {
 }
 
 impl Bot {
+    pub fn interaction(&self) -> Result<InteractionClient<'_>> {
+        let application_id = self
+            .application_id
+            .get()
+            .copied()
+            .ok_or_else(|| eden_utils::Error::unknown(UninitAppIdError))?;
+
+        Ok(self.0.http.interaction(application_id))
+    }
+
     pub async fn test_db_pool(&self) -> Result<()> {
         tracing::debug!("testing database pool...");
 

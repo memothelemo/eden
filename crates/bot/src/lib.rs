@@ -6,6 +6,7 @@ pub use self::settings::Settings;
 
 pub mod error;
 pub mod events;
+pub mod interactions;
 pub mod settings;
 pub mod shard;
 pub mod tasks;
@@ -17,7 +18,7 @@ use std::sync::Arc;
 use tokio::task::JoinSet;
 use twilight_gateway::{Intents, Shard, ShardId};
 
-const INTENTS: Intents = Intents::GUILDS;
+const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_MESSAGES);
 
 pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
     let bot = Bot::new(settings);
@@ -28,7 +29,7 @@ pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
         .attach_printable("could not create shards")?;
 
     // Resolve bot's application id
-    if bot.application_id.get().is_none() {
+    if bot.settings.bot.application_id.is_none() {
         tracing::debug!("`bot.application_id` is missing. fetching bot information...");
         update_bot_info(&bot)
             .await

@@ -46,6 +46,7 @@ pub async fn main(
 
         let ctx = ShardContext {
             bot: bot.clone(),
+            latency: shard.latency().clone(),
             shard_id: id,
         };
 

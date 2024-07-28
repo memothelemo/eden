@@ -33,6 +33,8 @@ doku = "0.21.1"
 twilight-gateway = { version = "0.15.4", features = ["rustls-native-roots", "zlib-simd"] }
 twilight-http = { version = "0.15.4", default-features = false, features = ["rustls-native-roots", "decompression"] }
 twilight-model.workspace = true
+twilight-interactions = "0.15.1"
+twilight-util = { version = "0.15.2", features = ["builder", "snowflake"] }
 
 [lints]
 workspace = true

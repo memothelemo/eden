@@ -31,7 +31,7 @@ where
         }
 
         let result = self.0.semaphore.acquire().await.ok();
-        tracing::debug!("queue semaphore permitted task to run");
+        tracing::trace!("queue semaphore permitted task to run");
         result
     }
 

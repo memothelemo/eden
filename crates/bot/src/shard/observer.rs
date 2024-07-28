@@ -44,7 +44,7 @@ pub async fn observe_shards(total: usize, mut rx: mpsc::UnboundedReceiver<ShardO
 
         #[cfg(release)]
         {
-            println!("{active}/{total_shards} shard(s) connected");
+            println!("{active}/{total} shard(s) connected");
         }
     }
 }

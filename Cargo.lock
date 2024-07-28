@@ -667,7 +667,9 @@ dependencies = [
  "tracing",
  "twilight-gateway",
  "twilight-http",
+ "twilight-interactions",
  "twilight-model",
+ "twilight-util",
 ]
 
 [[package]]
@@ -3002,6 +3004,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "twilight-interactions"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f147662174686043822ade9d0abb388d8ac460edb77ba908145fd96edb285795"
+dependencies = [
+ "twilight-interactions-derive",
+ "twilight-model",
+]
+
+[[package]]
+name = "twilight-interactions-derive"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a297ef39ee60e672ff47624acb4f4fff5f700dcb2b509230664916f20a7d489"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.70",
+]
+
+[[package]]
 name = "twilight-model"
 version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3012,6 +3035,16 @@ dependencies = [
  "serde-value",
  "serde_repr",
  "time",
+]
+
+[[package]]
+name = "twilight-util"
+version = "0.15.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe3149347d8222e042a55deba80cd32f93f14770bbb845b8e4cfbd70a5062c56"
+dependencies = [
+ "twilight-model",
+ "twilight-validate",
 ]
 
 [[package]]

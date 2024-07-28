@@ -21,7 +21,6 @@ async fn bootstrap(settings: Settings) -> eden_utils::Result<()> {
 
 #[allow(clippy::unwrap_used)]
 fn start() -> eden_utils::Result<()> {
-    println!("{}", Settings::generate_docs());
     let settings = Settings::from_env()?;
 
     #[cfg(release)]

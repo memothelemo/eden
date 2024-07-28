@@ -28,7 +28,7 @@ pub async fn catch_signals() {
     let manual_shutdown = graceful();
     tokio::select! {
         _ = signal => {
-            tracing::info!("received shutdown signal. performing graceful shutdown...");
+            tracing::warn!("received shutdown signal. performing graceful shutdown...");
             STATE.graceful_notify.notify_waiters();
         },
         _ = manual_shutdown => {}
