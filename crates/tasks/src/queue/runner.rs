@@ -157,7 +157,7 @@ where
                         .map(|_| ())
                         .anonymize_error()
                 } else {
-                    tracing::debug!("retrying task {:?} for {delta:?}", task.data.kind,);
+                    tracing::debug!("retrying task {:?} for {delta:?}", task.data.kind);
                     self.requeue(task.id, Scheduled::In(delta), Some(now), task.attempts + 1)
                         .await
                         .anonymize_error()

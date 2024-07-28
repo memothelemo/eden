@@ -474,8 +474,11 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TaskRunner")
-            .field("config", &self.0.config)
             .field("registered_tasks", &self.0.registry.len())
+            .field(
+                "running_tasks",
+                &self.0.running_tasks.load(Ordering::SeqCst),
+            )
             .field("state", &std::any::type_name::<S>())
             .finish()
     }

@@ -6,6 +6,7 @@ mod suggestion;
 pub mod env;
 pub mod error;
 pub mod hash;
+pub mod serial;
 pub mod time;
 
 pub use self::error::{Error, ErrorCategory, Result};

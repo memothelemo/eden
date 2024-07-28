@@ -7,13 +7,16 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+fundu = { version = "2.0.0", features = ["chrono"] }
+strum_macros = "0.26.4"
+
 chrono.workspace = true
 dotenvy.workspace = true
 error-stack.workspace = true
 serde.workspace = true
+serde_with.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
-strum_macros = "0.26.4"
 thiserror.workspace = true
 tokio.workspace = true
 tracing-error.workspace = true

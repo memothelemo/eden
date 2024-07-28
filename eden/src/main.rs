@@ -1,23 +1,34 @@
+use eden_bot::{Bot, Settings};
+use eden_tasks::Scheduled;
 use eden_utils::error::ResultExt;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::str::FromStr;
 use tracing::level_filters::LevelFilter;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt, Layer};
 
-#[allow(clippy::unnecessary_wraps, clippy::unwrap_used)]
-async fn bootstrap() -> eden_utils::Result<()> {
-    let db_url = eden_utils::env::var("DATABASE_URL")?;
-    let _pool = PgPoolOptions::new()
-        .connect_with(PgConnectOptions::from_str(&db_url).anonymize_error()?)
-        .await
-        .anonymize_error()?;
+#[allow(clippy::unnecessary_wraps, clippy::unwrap_used, clippy::unused_async)]
+async fn bootstrap(settings: Settings) -> eden_utils::Result<()> {
+    println!("{}", Settings::generate_docs());
+    println!("{settings:#?}");
+
+    let bot = Bot::new(settings);
+    println!("{bot:#?}");
+
+    // let db_url = eden_utils::env::var("DATABASE_URL")?;
+    // let _pool = PgPoolOptions::new()
+    //     .connect_with(PgConnectOptions::from_str(&db_url).anonymize_error()?)
+    //     .await
+    //     .anonymize_error()?;
 
     Ok(())
 }
 
 #[allow(clippy::unwrap_used)]
 fn start() -> eden_utils::Result<()> {
+    let settings = Settings::from_env()?;
+
+    // I don't know how it happens but it somehow fixed the issue
+    // of some events not emitted through the console likely
+    // because of inconsistences `log` and `tracing` crates.
     tracing_log::LogTracer::init().attach_printable("could not initialize log tracer")?;
 
     let env_filter = tracing_subscriber::EnvFilter::builder()
@@ -40,7 +51,7 @@ fn start() -> eden_utils::Result<()> {
         .enable_all()
         .build()
         .unwrap()
-        .block_on(bootstrap())
+        .block_on(bootstrap(settings))
 }
 
 fn main() {
