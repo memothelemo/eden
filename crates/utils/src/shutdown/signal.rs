@@ -28,9 +28,11 @@ pub async fn shutdown_signal() {
 
     let mut sigint = signal(SignalKind::interrupt()).expect("failed to install SIGINT handler");
     let mut sigterm = signal(SignalKind::terminate()).expect("failed to install SIGTERM handler");
+    let mut sigquit = signal(SignalKind::quit()).expect("failed to install SIGQUIT handler");
 
     tokio::select! {
         _ = sigint.recv() => {},
         _ = sigterm.recv() => {},
+        _ = sigquit.recv() => {},
     };
 }

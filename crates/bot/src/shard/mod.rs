@@ -33,7 +33,7 @@ pub async fn main(
         if shard.status().is_disconnected() && !did_send_disconnect_msg {
             did_send_disconnect_msg = true;
             if let Err(error) = observer_tx.send(ShardObserverMessage::Restart(id)) {
-                tracing::warn!(?error, "cannot send message to shards observer");
+                tracing::warn!(%error, "cannot send message to shards observer");
             }
         }
 
@@ -50,14 +50,15 @@ pub async fn main(
             shard_id: id,
         };
 
-        // ready event will happen once per successful connection anyway :)
-        if event.kind() == EventType::Ready {
+        // ready/resumed event will happen once per successful connection anyway :)
+        if matches!(event.kind(), EventType::Ready | EventType::Resumed) {
             did_send_disconnect_msg = false;
             if let Err(error) = observer_tx.send(ShardObserverMessage::Ready(id)) {
-                tracing::warn!(?error, "cannot send message to shards observer");
+                tracing::warn!(%error, "cannot send message to shards observer");
             }
         }
 
+        tracing::trace!("received event {:?}", event.kind());
         tasks.spawn(crate::events::handle_event(ctx, event));
     }
 
@@ -77,7 +78,10 @@ pub async fn main(
         }
     }
 
-    try_close_shard(&mut shard).await;
+    tokio::select! {
+        _ = try_close_shard(&mut shard) => {},
+        _ = eden_utils::shutdown::aborted() => {}
+    }
 }
 
 macro_rules! log_shard_error {
@@ -92,25 +96,21 @@ macro_rules! log_shard_error {
 
 async fn try_close_shard(shard: &mut Shard) {
     if let Err(error) = shard.close(CloseFrame::NORMAL).await {
-        tracing::warn!(?error, "failed to close shard connection");
+        tracing::warn!(%error, "failed to close shard connection");
     }
 
     // Wait until WebSocket connection is FINALLY CLOSED
     loop {
         match shard.next_message().await {
-            Ok(..) => break,
+            Ok(..) => {}
             // Interesting error while I was hosting my own bot,
             // you can disable this if you really want to.
-            Err(source) if matches!(source.kind(), ReceiveMessageErrorType::Io) => {
-                break;
-            }
+            Err(source) if matches!(source.kind(), ReceiveMessageErrorType::Io) => {}
             Err(source) => {
                 log_shard_error!(source);
-                if source.is_fatal() {
-                    break;
-                }
             }
         }
+        break;
     }
 }
 

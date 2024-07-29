@@ -146,7 +146,7 @@ impl Task {
         .bind(form.priority)
         .bind(form.status)
         .bind(data)
-        // due to limitations with PullAllQueueTasks query, we have to
+        // due to limitations with PullAllPendingTasks query, we have to
         // bind this argument to update `updated_at` manually.
         .bind(Utc::now())
         .bind(id)
@@ -187,6 +187,19 @@ impl Task {
             .await
             .change_context(QueryError)
             .attach_printable_lazy(|| format!("could not delete all tasks with status {status:?}"))
+            .map(|v| v.rows_affected())
+    }
+
+    pub async fn delete_all_with_type(
+        conn: &mut sqlx::PgConnection,
+        task_type: &str,
+    ) -> Result<u64, QueryError> {
+        sqlx::query(r"DELETE FROM tasks WHERE data->>'type' = $1")
+            .bind(task_type)
+            .execute(conn)
+            .await
+            .change_context(QueryError)
+            .attach_printable_lazy(|| format!("could not delete all tasks with type {task_type:?}"))
             .map(|v| v.rows_affected())
     }
 }

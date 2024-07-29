@@ -7,7 +7,6 @@ use std::{fmt::Debug, mem::MaybeUninit, ops::Deref, sync::Arc};
 use twilight_http::client::InteractionClient;
 use twilight_http::Client as HttpClient;
 
-use crate::error::UninitAppIdError;
 use crate::Settings;
 
 /// It holds the main components of the application such as
@@ -25,6 +24,14 @@ impl Bot {
 
         if let Some(proxy) = settings.bot.http.proxy.as_ref() {
             http = http.proxy(proxy.as_str().into(), settings.bot.http.proxy_use_http);
+        }
+
+        let application_id = OnceCell::new();
+        if let Some(value) = settings.bot.application_id {
+            match application_id.set(value) {
+                Ok(..) => {}
+                Err(..) => panic!("unexpected application_id is full"),
+            }
         }
 
         let http = Arc::new(http.build());
@@ -58,7 +65,7 @@ impl Bot {
         unsafe {
             let inner = &mut *(Arc::as_ptr(&inner_uninit) as *mut MaybeUninit<BotInner>);
             inner.write(BotInner {
-                application_id: OnceCell::new(),
+                application_id,
                 http,
                 pool,
                 queue,
@@ -71,14 +78,11 @@ impl Bot {
 }
 
 impl Bot {
-    pub fn interaction(&self) -> Result<InteractionClient<'_>> {
-        let application_id = self
-            .application_id
-            .get()
-            .copied()
-            .ok_or_else(|| eden_utils::Error::unknown(UninitAppIdError))?;
-
-        Ok(self.0.http.interaction(application_id))
+    pub fn interaction(&self) -> InteractionClient<'_> {
+        let Some(application_id) = self.application_id.get().copied() else {
+            panic!("tried to call bot.interaction while the bot is not ready");
+        };
+        self.0.http.interaction(application_id)
     }
 
     pub async fn test_db_pool(&self) -> Result<()> {
@@ -120,6 +124,15 @@ mod private {
     use super::*;
     use twilight_model::id::{marker::ApplicationMarker, Id};
 
+    #[derive(Debug)]
+    pub struct BotInner {
+        pub application_id: OnceCell<Id<ApplicationMarker>>,
+        pub http: Arc<HttpClient>,
+        pub pool: sqlx::PgPool,
+        pub queue: Queue<Bot>,
+        pub settings: Arc<Settings>,
+    }
+
     pub struct DebugAppId<'a>(pub &'a OnceCell<Id<ApplicationMarker>>);
 
     impl<'a> Debug for DebugAppId<'a> {
@@ -138,15 +151,6 @@ mod private {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct(&self.0).finish_non_exhaustive()
         }
-    }
-
-    #[derive(Debug)]
-    pub struct BotInner {
-        pub application_id: OnceCell<Id<ApplicationMarker>>,
-        pub http: Arc<HttpClient>,
-        pub pool: sqlx::PgPool,
-        pub queue: Queue<Bot>,
-        pub settings: Arc<Settings>,
     }
 }
 use self::private::*;

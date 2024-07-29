@@ -1,18 +1,17 @@
-use eden_utils::{Error, Result};
-use thiserror::Error;
+use eden_utils::Result;
 use twilight_model::gateway::payload::incoming::Ready;
 
 use crate::shard::ShardContext;
 
-#[derive(Debug, Error)]
-#[error("unable to override application id")]
-struct SetApplicationIdError;
-
-pub fn handle(ctx: &ShardContext, data: &Ready) -> Result<()> {
+#[tracing::instrument(skip_all, fields(
+    %data.application.id,
+    data.guilds.len = %data.guilds.len(),
+    %data.version,
+))]
+pub async fn handle(ctx: &ShardContext, data: &Ready) -> Result<()> {
     tracing::debug!("shard is ready");
 
     let actual_id = data.application.id;
-
     let configured_id = ctx.bot.settings.bot.application_id;
     let expected_id = ctx.bot.application_id.get().cloned().or(configured_id);
 
@@ -25,10 +24,9 @@ pub fn handle(ctx: &ShardContext, data: &Ready) -> Result<()> {
         );
 
         // take it first heheheh
-        let id_ref = &ctx.bot.application_id;
-        id_ref
-            .set(actual_id)
-            .map_err(|_| Error::unknown(SetApplicationIdError))?;
+        if ctx.bot.application_id.set(actual_id).is_err() {
+            tracing::warn!("could not replace new application ID");
+        }
     }
 
     Ok(())

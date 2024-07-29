@@ -16,9 +16,7 @@ use eden_utils::error::{AnyResultExt, ResultExt};
 use eden_utils::Result;
 use std::sync::Arc;
 use tokio::task::JoinSet;
-use twilight_gateway::{Intents, Shard, ShardId};
-
-const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_MESSAGES);
+use twilight_gateway::{Shard, ShardId};
 
 pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
     let bot = Bot::new(settings);
@@ -35,6 +33,13 @@ pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
             .await
             .attach_printable(format!("could not fetch bot information"))?;
     }
+
+    // To avoid sending multiple register command requests to Discord
+    tracing::debug!("clearing queued register command tasks");
+    bot.queue
+        .clear_all_with::<tasks::RegisterCommands>()
+        .await
+        .change_context(StartBotError)?;
 
     bot.queue.start().await.change_context(StartBotError)?;
 
@@ -65,19 +70,23 @@ async fn create_shards(bot: &Bot) -> Result<Vec<Shard>, StartBotError> {
     use twilight_gateway::Config;
 
     let token = bot.settings.bot.token.as_str().to_string();
+    let gateway_config = Config::builder(token, events::INTENTS)
+        .event_types(events::FILTERED_EVENT_TYPES)
+        .build();
+
     let shards = match bot.settings.bot.sharding {
         Sharding::Single { id, total } => {
             let id = id.clamp(0, total.get());
-            vec![Shard::new(ShardId::new(id, total.get()), token, INTENTS)]
+            let id = ShardId::new(id, total.get());
+            vec![Shard::with_config(id, gateway_config)]
         }
         Sharding::Range {
             start, end, total, ..
         } => {
-            let shared_config = Config::builder(token, INTENTS).build();
             let start = start.clamp(0, total.get() - 1);
             let end = end.get().clamp(start, total.get() - 1);
             let start = start.clamp(0, end);
-            create_range(start..end, total.get(), shared_config, |_, builder| {
+            create_range(start..end, total.get(), gateway_config, |_, builder| {
                 builder.build()
             })
             .collect::<Vec<_>>()
@@ -92,9 +101,14 @@ async fn init_all_shards(bot: Bot, shards: Vec<Shard>) -> Result<(), StartBotErr
 
     let mut running_shards = JoinSet::new();
     let (observer_tx, observer_rx) = tokio::sync::mpsc::unbounded_channel();
-    let total_shards = shards.len();
 
-    let shards_observer_handle = tokio::spawn(shard::observe_shards(shards.len(), observer_rx));
+    let total_shards = shards.len();
+    let observe_shards_handle = tokio::spawn(shard::observe_shards(
+        bot.clone(),
+        shards.len(),
+        observer_rx,
+    ));
+
     for shard in shards {
         running_shards.spawn(self::shard::main(shard, bot.clone(), observer_tx.clone()));
     }
@@ -111,7 +125,7 @@ async fn init_all_shards(bot: Bot, shards: Vec<Shard>) -> Result<(), StartBotErr
         }
     }
 
-    shards_observer_handle
+    observe_shards_handle
         .await
         .change_context(StartBotError)
         .attach_printable("shard observer thread got crashed")?;
@@ -121,7 +135,6 @@ async fn init_all_shards(bot: Bot, shards: Vec<Shard>) -> Result<(), StartBotErr
 }
 
 async fn update_bot_info(bot: &Bot) -> Result<(), StartBotError> {
-    // TODO: twilight-http does not cancel the future if response fails. try implementing timeout
     let response = bot
         .http
         .current_user_application()

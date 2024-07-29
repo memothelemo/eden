@@ -5,10 +5,11 @@ mod into_impls;
 
 pub use self::category::*;
 pub use self::ext::*;
-use error_stack::iter::RequestRef;
+
 pub use error_stack::Context;
 
 use self::any::{AnonymizedError, AnyError};
+use error_stack::iter::RequestRef;
 use error_stack::Report;
 use std::{fmt, marker::PhantomData};
 use tracing_error::SpanTrace;
@@ -165,6 +166,12 @@ impl Error {
 }
 
 impl Error {
+    pub fn install_hook<T: Send + Sync + 'static>(
+        hook: impl Fn(&T, &mut error_stack::fmt::HookContext<T>) + Send + Sync + 'static,
+    ) {
+        error_stack::Report::install_debug_hook::<T>(hook);
+    }
+
     pub fn init() {
         use error_stack::fmt::{Charset, ColorMode};
 

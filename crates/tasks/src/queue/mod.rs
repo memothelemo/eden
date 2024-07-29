@@ -81,7 +81,10 @@ where
     ///
     /// It returns the total amount of tasks deleted from
     /// the database.
-    pub async fn clear_all_with(&self, status: TaskStatus) -> Result<u64, ClearAllTasksError> {
+    pub async fn clear_all_with_status(
+        &self,
+        status: TaskStatus,
+    ) -> Result<u64, ClearAllTasksError> {
         tracing::info!(?status, "clearing all queued tasks with filtered status");
 
         let mut conn = self
@@ -93,6 +96,39 @@ where
             .await
             .change_context(ClearAllTasksError)
             .attach_printable_lazy(|| format!("with status: {status:?}"))?;
+
+        conn.commit()
+            .await
+            .change_context(ClearAllTasksError)
+            .attach_printable("could not commit database transaction")?;
+
+        Ok(deleted)
+    }
+
+    /// Attempts to clear all queued tasks from the database
+    /// with given task type only.
+    ///
+    /// If it fails, this operation will revert back before the
+    /// deletion of all available tasks.
+    ///
+    /// It returns the total amount of tasks with specific task type
+    /// deleted from the database.
+    pub async fn clear_all_with<T>(&self) -> Result<u64, ClearAllTasksError>
+    where
+        T: AnyTask<State = S>,
+    {
+        let kind = T::task_type();
+        tracing::info!(?kind, "clearing all queued tasks with filtered type");
+
+        let mut conn = self
+            .db_transaction()
+            .await
+            .transform_context(ClearAllTasksError)?;
+
+        let deleted = Task::delete_all_with_type(&mut conn, kind)
+            .await
+            .change_context(ClearAllTasksError)
+            .attach_printable_lazy(|| format!("with type: {kind:?}"))?;
 
         conn.commit()
             .await

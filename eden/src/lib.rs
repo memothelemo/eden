@@ -6,6 +6,7 @@ pub mod diagnostics;
 pub fn install_prerequisite_hooks() {
     eden_utils::Suggestion::install_hooks();
     eden_utils::Error::init();
+    eden_bot::interactions::MissingPermissions::install_error_hook();
 }
 
 pub fn print_launch(settings: &Settings) {
