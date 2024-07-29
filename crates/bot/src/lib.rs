@@ -6,7 +6,6 @@ pub use self::settings::Settings;
 
 pub mod error;
 pub mod events;
-pub mod interactions;
 pub mod settings;
 pub mod shard;
 pub mod tasks;

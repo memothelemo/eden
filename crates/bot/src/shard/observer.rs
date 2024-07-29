@@ -1,9 +1,8 @@
-use eden_tasks::Scheduled;
 use futures::future::select;
 use tokio::sync::mpsc;
 use twilight_gateway::ShardId;
 
-use crate::{tasks, Bot};
+use crate::Bot;
 
 #[derive(Debug)]
 pub enum ShardObserverMessage {
@@ -53,25 +52,25 @@ pub async fn observe_shards(
             println!("{active}/{total} shard(s) connected");
         }
 
-        let should_register_commands =
-            !has_registered_commands && matches!(message, ShardObserverMessage::Ready(..));
+        // let should_register_commands =
+        //     !has_registered_commands && matches!(message, ShardObserverMessage::Ready(..));
 
-        if should_register_commands {
-            let Err(error) = bot.register_commands().await else {
-                continue;
-            };
-            tracing::warn!(%error, "failed to register slash commands");
+        // if should_register_commands {
+        //     let Err(error) = bot.register_commands().await else {
+        //         continue;
+        //     };
+        //     tracing::warn!(%error, "failed to register slash commands");
 
-            // register commands for 5 minutes, maybe we're rate limited
-            let result = bot
-                .queue
-                .schedule(tasks::RegisterCommands, Scheduled::in_minutes(5))
-                .await;
+        //     // register commands for 5 minutes, maybe we're rate limited
+        //     let result = bot
+        //         .queue
+        //         .schedule(tasks::RegisterCommands, Scheduled::in_minutes(5))
+        //         .await;
 
-            if let Err(error) = result {
-                let error = error.anonymize();
-                tracing::warn!(%error, "failed to schedule to register commands for later");
-            }
-        }
+        //     if let Err(error) = result {
+        //         let error = error.anonymize();
+        //         tracing::warn!(%error, "failed to schedule to register commands for later");
+        //     }
+        // }
     }
 }

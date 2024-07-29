@@ -3,7 +3,7 @@ use twilight_gateway::{Event, EventTypeFlags, Intents};
 
 use crate::shard::ShardContext;
 
-pub mod interaction_create;
+pub mod interaction;
 pub mod ready;
 
 pub(crate) const INTENTS: Intents = Intents::GUILDS
@@ -24,7 +24,7 @@ pub(crate) const FILTERED_EVENT_TYPES: EventTypeFlags = EventTypeFlags::READY
 pub async fn handle_event(ctx: ShardContext, event: Event) {
     let event_kind = event.kind();
     let result: Result<()> = match event {
-        Event::InteractionCreate(data) => self::interaction_create::handle(&ctx, *data).await,
+        Event::InteractionCreate(data) => self::interaction::handle(&ctx, data.0).await,
         Event::Ready(data) => self::ready::handle(&ctx, &data).await,
         Event::Resumed => {
             tracing::debug!("shard resumed gateway session");
