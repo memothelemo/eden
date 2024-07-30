@@ -38,6 +38,8 @@ impl Command for PayerRegister {
                 .attach_printable("could not get guild member's user info");
         };
 
+        ctx.defer(true).await?;
+
         let mut conn = ctx.bot.db_connection().await?;
         if Payer::from_id(&mut conn, user.id).await?.is_some() {
             let embed = embeds::error("Cannot register as payer", None)
@@ -56,8 +58,6 @@ impl Command for PayerRegister {
         if self.needs_admin_approval(ctx, member)? {
             todo!()
         }
-
-        ctx.defer(true).await?;
 
         let form = InsertPayerForm::builder()
             .id(user.id)

@@ -5,7 +5,7 @@ use serde_with::serde_as;
 use std::fmt::Debug;
 use std::num::NonZeroU64;
 use std::time::Duration;
-use twilight_model::id::marker::{ApplicationMarker, GuildMarker};
+use twilight_model::id::marker::{ApplicationMarker, GuildMarker, UserMarker};
 use twilight_model::id::Id;
 
 #[derive(Debug, Deserialize, Document, Serialize)]
@@ -21,6 +21,13 @@ pub struct Bot {
     /// to avoid getting rate limited from Discord.
     #[doku(as = "String", example = "745809834183753828")]
     pub(crate) application_id: Option<Id<ApplicationMarker>>,
+
+    /// A list of developers that have special privileges to Eden unlike
+    /// standard users. Special privileges include:
+    ///
+    /// - Able to see the entire error of why it isn't working.
+    #[doku(as = "Vec<String>", example = "[\"876711213126520882\"]")]
+    pub(crate) developers: Vec<Id<UserMarker>>,
 
     /// Parameters for configuring what Eden should behave when
     /// dealing with commands and operations inside your guild/server.
@@ -67,6 +74,11 @@ impl Bot {
     #[must_use]
     pub fn application_id(&self) -> Option<Id<ApplicationMarker>> {
         self.application_id
+    }
+
+    #[must_use]
+    pub fn is_developer_user(&self, user_id: Id<UserMarker>) -> bool {
+        self.developers.iter().any(|v| *v == user_id)
     }
 
     #[must_use]

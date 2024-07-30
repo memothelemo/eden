@@ -4,7 +4,6 @@ use eden_utils::Result;
 use std::fmt::Debug;
 use twilight_interactions::command::{CommandInputData, CommandModel, CreateCommand};
 use twilight_model::guild::Permissions;
-use twilight_util::builder::InteractionResponseDataBuilder;
 
 use super::InteractionContext;
 use crate::interaction::embeds;
@@ -66,10 +65,8 @@ pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
         if !is_user_error {
             tracing::warn!(%error, "command {name:?} failed");
 
-            let embed = embeds::internal_error(ran_at).build();
-            let data = InteractionResponseDataBuilder::new()
-                .embeds(vec![embed])
-                .build();
+            let author_id = ctx.interaction.author_id();
+            let data = embeds::internal_error(&ctx.bot, author_id, &error, ran_at);
 
             ctx.respond(data)
                 .await

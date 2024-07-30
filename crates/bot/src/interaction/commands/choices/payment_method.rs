@@ -24,7 +24,7 @@ impl PaymentMethodOption {
 impl Debug for PaymentMethodOption {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Self::Mynt => &*MYNT_ALIAS_NAME,
+            Self::Mynt => "Mynt",
             Self::PayPal => "PayPal",
         })
     }

@@ -1,4 +1,4 @@
-#![feature(new_uninit)]
+#![feature(let_chains, new_uninit)]
 mod context;
 
 pub use self::context::*;

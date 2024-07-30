@@ -1,6 +1,6 @@
+use eden_utils::error::ResultExt;
 use eden_utils::Result;
 use twilight_interactions::command::{CommandModel, CreateCommand};
-use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::interaction::commands::choices::PaymentMethodOption;
 use crate::interaction::commands::{Command, CommandContext};
@@ -14,9 +14,9 @@ pub struct PayerTest {
 }
 
 impl Command for PayerTest {
-    #[tracing::instrument(skip(ctx))]
-    async fn run(&self, ctx: &CommandContext<'_>) -> Result<()> {
-        let data = InteractionResponseDataBuilder::new().content("Hi!").build();
-        ctx.respond(data).await
+    #[tracing::instrument(skip(_ctx))]
+    async fn run(&self, _ctx: &CommandContext<'_>) -> Result<()> {
+        tokio::fs::read("woopp!!").await.anonymize_error()?;
+        Ok(())
     }
 }
