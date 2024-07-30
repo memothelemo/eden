@@ -22,7 +22,7 @@ pub struct Bot {
     #[doku(as = "String", example = "745809834183753828")]
     pub(crate) application_id: Option<Id<ApplicationMarker>>,
 
-    /// A list of developers that have special privileges to Eden unlike
+    /// A list of developers who have special privileges to Eden unlike
     /// standard users. Special privileges include:
     ///
     /// - Able to see the entire error of why it isn't working.
