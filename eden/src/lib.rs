@@ -23,6 +23,9 @@ Y88888P Y8888D' Y88888P VP   V8P
     let header = Style::new().bold();
     let ascii_art = Style::new().fg(Color::Green).paint(ascii_art);
 
+    let enabled_color = Style::new().fg(Color::Green);
+    let disabled_color = Style::new().fg(Color::Red);
+
     eprintln!("{ascii_art}");
     eprintln!(
         "{}:\t{} ({})",
@@ -32,12 +35,21 @@ Y88888P Y8888D' Y88888P VP   V8P
     );
     eprintln!("{}:\t{}", header.paint("Commit hash"), BUILD.commit_hash);
     eprintln!("{}:\t{}", header.paint("Commit date"), BUILD.commit_date);
+    eprintln!();
 
     if let Some(path) = settings.path() {
         eprintln!("{}:\t{}", header.paint("Settings file"), path.display());
     } else {
         eprintln!("{}:\t<none>", header.paint("Settings file"));
     }
+    eprintln!(
+        "{}:\t{}",
+        header.paint("Caching"),
+        match settings.bot().http().use_cache() {
+            true => enabled_color.paint("enabled"),
+            false => disabled_color.paint("disabled"),
+        }
+    );
 
     eprintln!();
 }

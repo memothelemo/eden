@@ -14,7 +14,13 @@ fn emit_git_variables() -> Result<()> {
 }
 
 fn main() {
+    println!("cargo::rustc-check-cfg=cfg(release)");
+
     if let Ok(value) = std::env::var("PROFILE") {
+        if value == "release" {
+            println!("cargo:rustc-cfg=release");
+        }
+
         println!("cargo:rustc-env=BUILD_PROFILE={value}");
     } else {
         println!("cargo:error=failed to get build profile");

@@ -3,9 +3,11 @@ mod context;
 
 pub use self::context::*;
 pub use self::settings::Settings;
+pub use self::shard::ShardContext;
 
 pub mod error;
 pub mod events;
+pub mod interaction;
 pub mod settings;
 pub mod shard;
 pub mod tasks;
@@ -96,7 +98,22 @@ async fn create_shards(bot: &Bot) -> Result<Vec<Shard>, StartBotError> {
 }
 
 async fn init_all_shards(bot: Bot, shards: Vec<Shard>) -> Result<(), StartBotError> {
+    #[cfg(not(release))]
     tracing::info!("starting bot with {} shards", shards.len());
+
+    #[cfg(release)]
+    println!("Starting bot with {} shards", shards.len());
+
+    // The release version notice that caching is enabled is in eden::print_launch
+    #[cfg(not(release))]
+    tracing::debug!(
+        "caching is {}",
+        if bot.settings.bot.http.use_cache {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
 
     let mut running_shards = JoinSet::new();
     let (observer_tx, observer_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -117,7 +134,10 @@ async fn init_all_shards(bot: Bot, shards: Vec<Shard>) -> Result<(), StartBotErr
 
     loop {
         let closed_shards = total_shards - running_shards.len();
+        #[cfg(not(release))]
         tracing::info!("waiting for {closed_shards}/{total_shards} shard(s) to finish");
+        #[cfg(release)]
+        println!("Waiting for {closed_shards}/{total_shards} shard(s) to finish");
 
         if running_shards.join_next().await.is_none() {
             break;

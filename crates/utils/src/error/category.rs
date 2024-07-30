@@ -12,3 +12,11 @@ pub enum ErrorCategory {
     #[strum(to_string = "Error occurred")]
     Unknown,
 }
+
+impl ErrorCategory {
+    #[must_use]
+    pub fn is_user_error(&self) -> bool {
+        // Self::Guild is considered as human error
+        matches!(self, Self::Guild | Self::User)
+    }
+}

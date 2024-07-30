@@ -53,6 +53,7 @@ tracing-error = "0.2.0"
 
 # twilight crates
 twilight-model = "0.15.4"
+twilight-interactions = "0.15.2"
 
 # testing
 static_assertions = "1.1.0"

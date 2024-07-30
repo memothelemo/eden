@@ -9,7 +9,10 @@ use std::sync::atomic::Ordering;
 /// Attempts to perform graceful shutdown the entire process without
 /// the user or the host trigger the shutdown signal.
 pub fn shutdown() {
+    #[cfg(not(release))]
     tracing::info!("requested shutdown. performing graceful shutdown...");
+    #[cfg(release)]
+    println!("Requested shutdown. Shutting down Eden instance...");
     STATE.graceful_notify.notify_waiters();
 }
 
@@ -28,7 +31,11 @@ pub async fn catch_signals() {
     let manual_shutdown = graceful();
     tokio::select! {
         _ = signal => {
+            #[cfg(not(release))]
             tracing::warn!("received shutdown signal. performing graceful shutdown...");
+            #[cfg(release)]
+            println!("Requested shutdown. Performing graceful shutdown...");
+
             STATE.graceful_notify.notify_waiters();
         },
         _ = manual_shutdown => {}
@@ -39,7 +46,10 @@ pub async fn catch_signals() {
     // aborted shutdown
     tokio::spawn(async {
         abort_signal().await;
+        #[cfg(not(release))]
         tracing::warn!("received abort signal. aborting process...");
+        #[cfg(release)]
+        println!("Requested shutdown again. Aborting Eden instance...");
         STATE.abort_notify.notify_waiters();
     });
 }

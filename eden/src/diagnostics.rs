@@ -14,8 +14,13 @@ pub fn init(settings: &Settings) -> Result<()> {
     // because of inconsistences `log` and `tracing` crates.
     tracing_log::LogTracer::init().attach_printable("could not initialize log tracer")?;
 
+    #[cfg(release)]
+    let default_directive = LevelFilter::WARN;
+    #[cfg(not(release))]
+    let default_directive = LevelFilter::INFO;
+
     let env_filter = tracing_subscriber::EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
+        .with_default_directive(default_directive.into())
         .parse(settings.logging().targets())
         .anonymize_error()
         .attach_printable("could not parse log targets")

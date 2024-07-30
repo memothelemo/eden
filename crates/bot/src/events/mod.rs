@@ -1,10 +1,16 @@
 use eden_utils::Result;
+use twilight_cache_inmemory::ResourceType;
 use twilight_gateway::{Event, EventTypeFlags, Intents};
 
 use crate::shard::ShardContext;
 
 pub mod interaction;
 pub mod ready;
+
+pub(crate) const SHOULD_CACHE: ResourceType = ResourceType::GUILD
+    .union(ResourceType::USER)
+    .union(ResourceType::USER_CURRENT)
+    .union(ResourceType::CHANNEL);
 
 pub(crate) const INTENTS: Intents = Intents::GUILDS
     .union(Intents::DIRECT_MESSAGES)
@@ -13,7 +19,8 @@ pub(crate) const INTENTS: Intents = Intents::GUILDS
 pub(crate) const FILTERED_EVENT_TYPES: EventTypeFlags = EventTypeFlags::READY
     .union(EventTypeFlags::RESUMED)
     .union(EventTypeFlags::INTERACTION_CREATE)
-    .union(EventTypeFlags::DIRECT_MESSAGES);
+    .union(EventTypeFlags::DIRECT_MESSAGES)
+    .union(EventTypeFlags::GUILD_CREATE);
 
 #[tracing::instrument(skip_all, fields(
     ctx.latency = ?ctx.recent_latency(),
@@ -30,6 +37,9 @@ pub async fn handle_event(ctx: ShardContext, event: Event) {
             tracing::debug!("shard resumed gateway session");
             Ok(())
         }
+
+        // needed for caching
+        Event::GuildCreate(..) => Ok(()),
         _ => {
             tracing::warn!("received unimplemented {event_kind:?} event");
             Ok(())

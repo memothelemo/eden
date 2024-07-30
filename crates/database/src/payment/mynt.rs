@@ -5,15 +5,15 @@ use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MyntPhoneNum(String);
+pub struct PHPhoneNumber(String);
 
-impl Display for MyntPhoneNum {
+impl Display for PHPhoneNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.0, f)
     }
 }
 
-impl<'de> Deserialize<'de> for MyntPhoneNum {
+impl<'de> Deserialize<'de> for PHPhoneNumber {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -21,7 +21,7 @@ impl<'de> Deserialize<'de> for MyntPhoneNum {
         struct Visitor;
 
         impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = MyntPhoneNum;
+            type Value = PHPhoneNumber;
 
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str("philipine phone number")
@@ -39,7 +39,7 @@ impl<'de> Deserialize<'de> for MyntPhoneNum {
     }
 }
 
-impl Serialize for MyntPhoneNum {
+impl Serialize for PHPhoneNumber {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -48,7 +48,7 @@ impl Serialize for MyntPhoneNum {
     }
 }
 
-impl MyntPhoneNum {
+impl PHPhoneNumber {
     const LEN: usize = 11;
 
     #[must_use]
@@ -57,19 +57,19 @@ impl MyntPhoneNum {
     }
 }
 
-impl AsRef<[u8]> for MyntPhoneNum {
+impl AsRef<[u8]> for PHPhoneNumber {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
 }
 
-impl AsRef<str> for MyntPhoneNum {
+impl AsRef<str> for PHPhoneNumber {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl Deref for MyntPhoneNum {
+impl Deref for PHPhoneNumber {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -88,7 +88,7 @@ impl InvalidPHPhoneNumber {
     }
 }
 
-impl FromStr for MyntPhoneNum {
+impl FromStr for PHPhoneNumber {
     type Err = InvalidPHPhoneNumber;
 
     #[allow(clippy::unwrap_used)]

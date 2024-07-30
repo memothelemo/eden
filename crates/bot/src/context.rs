@@ -4,6 +4,7 @@ use eden_utils::Result;
 use once_cell::sync::OnceCell;
 use sqlx::postgres::PgPoolOptions;
 use std::{fmt::Debug, mem::MaybeUninit, ops::Deref, sync::Arc};
+use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_http::client::InteractionClient;
 use twilight_http::Client as HttpClient;
 
@@ -34,6 +35,15 @@ impl Bot {
             }
         }
 
+        let cache = InMemoryCache::builder()
+            .resource_types(if settings.bot.http.use_cache {
+                crate::events::SHOULD_CACHE
+            } else {
+                ResourceType::empty()
+            })
+            .build();
+
+        let cache = Arc::new(cache);
         let http = Arc::new(http.build());
         let pool = PgPoolOptions::new()
             .idle_timeout(settings.database.idle_timeout)
@@ -66,6 +76,7 @@ impl Bot {
             let inner = &mut *(Arc::as_ptr(&inner_uninit) as *mut MaybeUninit<BotInner>);
             inner.write(BotInner {
                 application_id,
+                cache,
                 http,
                 pool,
                 queue,
@@ -78,6 +89,11 @@ impl Bot {
 }
 
 impl Bot {
+    #[must_use]
+    pub fn is_cache_enabled(&self) -> bool {
+        self.0.settings.bot.http.use_cache
+    }
+
     pub fn interaction(&self) -> InteractionClient<'_> {
         let Some(application_id) = self.application_id.get().copied() else {
             panic!("tried to call bot.interaction while the bot is not ready");
@@ -95,6 +111,32 @@ impl Bot {
                 .attach_printable("database is unhealthy"),
             Err(error) => Err(error).anonymize_error(),
         }
+    }
+}
+
+impl Bot {
+    /// Tries to establish database connection
+    ///
+    /// Refer to [sqlx's `PoolConnection` object](sqlx::pool::PoolConnection) for more documentation
+    /// and how it should be used.
+    pub async fn db_connection(&self) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>> {
+        let pool = &self.0.pool;
+        pool.acquire()
+            .await
+            .anonymize_error()
+            .attach_printable("unable to establish connection to the database")
+    }
+
+    /// Tries to establish database transaction.
+    ///
+    /// Refer to [sqlx's Transaction object](sqlx::Transaction) for more documentation
+    /// and how it should be used.
+    pub async fn db_transaction(&self) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
+        let pool = &self.0.pool;
+        pool.begin()
+            .await
+            .anonymize_error()
+            .attach_printable("unable to start transaction from the database")
     }
 }
 
@@ -122,11 +164,15 @@ impl Debug for Bot {
 // to implement Deref for Bot object.
 mod private {
     use super::*;
+    use twilight_cache_inmemory::InMemoryCache;
     use twilight_model::id::{marker::ApplicationMarker, Id};
 
+    // TODO: database redundancy
     #[derive(Debug)]
     pub struct BotInner {
         pub application_id: OnceCell<Id<ApplicationMarker>>,
+        // TODO: Maybe use Redis to keep user cache data
+        pub cache: Arc<InMemoryCache>,
         pub http: Arc<HttpClient>,
         pub pool: sqlx::PgPool,
         pub queue: Queue<Bot>,

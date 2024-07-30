@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::{Debug, Display};
+use twilight_interactions::command::{CommandOption, CreateOption};
 
 /// Keeps the raw sensitive data in memory but it cannot be
 /// accidentally leaked through the console or logs.
@@ -150,5 +151,23 @@ impl<'r, DB: sqlx::Database, T: sqlx::Encode<'r, DB>> sqlx::Encode<'r, DB> for S
         buf: &mut <DB as sqlx::database::HasArguments<'r>>::ArgumentBuffer,
     ) -> sqlx::encode::IsNull {
         T::encode_by_ref(&self.0, buf)
+    }
+}
+
+impl<T: CreateOption> CreateOption for Sensitive<T> {
+    fn create_option(
+        data: twilight_interactions::command::internal::CreateOptionData,
+    ) -> twilight_model::application::command::CommandOption {
+        T::create_option(data)
+    }
+}
+
+impl<T: CommandOption> CommandOption for Sensitive<T> {
+    fn from_option(
+        value: twilight_model::application::interaction::application_command::CommandOptionValue,
+        data: twilight_interactions::command::internal::CommandOptionData,
+        resolved: Option<&twilight_model::application::interaction::application_command::CommandInteractionDataResolved>,
+    ) -> Result<Self, twilight_interactions::error::ParseOptionErrorType> {
+        T::from_option(value, data, resolved).map(Self)
     }
 }

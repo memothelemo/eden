@@ -5,7 +5,7 @@ use serde_with::serde_as;
 use std::fmt::Debug;
 use std::num::NonZeroU64;
 use std::time::Duration;
-use twilight_model::id::marker::ApplicationMarker;
+use twilight_model::id::marker::{ApplicationMarker, GuildMarker};
 use twilight_model::id::Id;
 
 #[derive(Debug, Deserialize, Document, Serialize)]
@@ -22,17 +22,10 @@ pub struct Bot {
     #[doku(as = "String", example = "745809834183753828")]
     pub(crate) application_id: Option<Id<ApplicationMarker>>,
 
-    // TODO: Find a way on how to securely keep the token from accessing it from the instance's memory in its raw value
-    /// This token used to connect and interact with the Discord API.
-    ///
-    /// **DO NOT SHARE THIS TOKEN TO ANYONE!**
-    ///
-    /// Your token served as your password to let Discord know that your
-    /// bot is trying to interact with Discord. Exposing your Discord bot
-    /// token to the public can get access to your bot possibly ruin
-    /// anyone's server/guild!
-    #[doku(as = "String", example = "<insert token here>")]
-    pub(crate) token: Sensitive<String>,
+    /// Parameters for configuring what Eden should behave when
+    /// dealing with commands and operations inside your guild/server.
+    #[serde(alias = "server")]
+    pub(crate) guild: Guild,
 
     /// Parameters for configuring what Eden should behave when
     /// it interacts with Discord's REST/HTTP API.
@@ -56,12 +49,29 @@ pub struct Bot {
     /// with an ID of 0 and size of 1 which is sufficient for small bots.
     #[serde(default)]
     pub(crate) sharding: Sharding,
+
+    // TODO: Find a way on how to securely keep the token from accessing it from the instance's memory in its raw value
+    /// This token used to connect and interact with the Discord API.
+    ///
+    /// **DO NOT SHARE THIS TOKEN TO ANYONE!**
+    ///
+    /// Your token served as your password to let Discord know that your
+    /// bot is trying to interact with Discord. Exposing your Discord bot
+    /// token to the public can get access to your bot possibly ruin
+    /// anyone's server/guild!
+    #[doku(as = "String", example = "<insert token here>")]
+    pub(crate) token: Sensitive<String>,
 }
 
 impl Bot {
     #[must_use]
     pub fn application_id(&self) -> Option<Id<ApplicationMarker>> {
         self.application_id
+    }
+
+    #[must_use]
+    pub fn guild(&self) -> &Guild {
+        &self.guild
     }
 
     #[must_use]
@@ -77,6 +87,49 @@ impl Bot {
     #[must_use]
     pub fn token(&self) -> &str {
         &self.token
+    }
+}
+
+#[derive(Debug, Deserialize, Document, Serialize)]
+pub struct Guild {
+    /// Whether Eden allows guild administrators (who have ADMINISTRATOR permission)
+    /// to register themselves as payers without the approval of other guild
+    /// administrators.
+    ///
+    /// If this option is disabled, the guild administrator must wait for any
+    /// guild administrators to approve their registration.
+    ///
+    /// You should allow self-registration if there's only you or one guild
+    /// administrators in your chosen guild. Otherwise, it is recommended to
+    /// not to do so.
+    ///
+    /// The default value if not set is true.
+    #[serde(default = "Guild::default_allow_self_payer_registration")]
+    pub(crate) allow_self_payer_registration: bool,
+
+    /// Your guild/server's ID.
+    ///
+    /// It is required as this is most of the time the bot is interacting
+    /// with and so with the members of your guild/server.
+    #[doku(as = "String", example = "442252698964721669")]
+    pub(crate) id: Id<GuildMarker>,
+}
+
+impl Guild {
+    #[must_use]
+    pub fn allow_self_payer_registration(&self) -> bool {
+        self.allow_self_payer_registration
+    }
+
+    #[must_use]
+    pub fn id(&self) -> Id<GuildMarker> {
+        self.id
+    }
+}
+
+impl Guild {
+    fn default_allow_self_payer_registration() -> bool {
+        true
     }
 }
 
@@ -140,19 +193,38 @@ pub struct Http {
     /// Whether Eden should use HTTP instead of HTTPS to connect
     /// through the proxy server.
     ///
-    /// The default is true if not set.
+    /// The default value is true if not set.
     #[doku(as = "bool", example = "true")]
     pub(crate) proxy_use_http: bool,
 
     /// Timeout for every HTTP requests
     ///
-    /// The default is 10 seconds if not set.
+    /// The default value is 10 seconds if not set.
     #[doku(as = "String", example = "30m")]
     #[serde_as(as = "eden_utils::serial::AsHumanDuration")]
     pub(crate) timeout: Duration,
+
+    /// Using cache allows Eden to minimize amount of REST/HTTP API requests,
+    /// requesting too much will lead to ratelimits.
+    ///
+    /// You may use cache if you don't care about the RAM usage of your
+    /// bot, somewhat likely to have outdated data and minimizing the amount
+    /// of REST/HTTP API as much as possible, you can enable caching.
+    ///
+    /// If you want to run Eden with lowest RAM usage as possible,
+    /// you may not want to use caching.
+    ///
+    /// The default value is false if not set.
+    #[doku(example = "false")]
+    pub(crate) use_cache: bool,
 }
 
 impl Http {
+    #[must_use]
+    pub fn use_cache(&self) -> bool {
+        self.use_cache
+    }
+
     #[must_use]
     pub fn proxy(&self) -> Option<&str> {
         self.proxy.as_deref()
@@ -172,6 +244,7 @@ impl Http {
 impl Default for Http {
     fn default() -> Self {
         Self {
+            use_cache: false,
             proxy: None,
             proxy_use_http: true,
             timeout: Duration::from_secs(10),

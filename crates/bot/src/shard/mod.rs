@@ -59,6 +59,7 @@ pub async fn main(
         }
 
         tracing::trace!("received event {:?}", event.kind());
+        bot.cache.update(&event);
         tasks.spawn(crate::events::handle_event(ctx, event));
     }
 

@@ -29,7 +29,7 @@ pub enum PaymentMethod {
         #[serde(skip_serializing_if = "Option::is_none")]
         name: Option<Sensitive<String>>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        phone_number: Option<Sensitive<MyntPhoneNum>>,
+        phone_number: Option<Sensitive<PHPhoneNumber>>,
         // Hosted somewhere using pict.rs
         #[serde(skip_serializing_if = "Option::is_none")]
         proof_image_url: Option<Sensitive<String>>,
