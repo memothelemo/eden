@@ -1,10 +1,10 @@
-use crate::interaction::{self, commands::CommandContext};
+// use crate::interaction::{s};
 use crate::shard::ShardContext;
 
 use eden_utils::Result;
 use tracing::warn;
 use twilight_model::application::interaction::{
-    application_command::CommandData, Interaction, InteractionData, InteractionType,
+    application_command::CommandData, Interaction, InteractionData,
 };
 
 #[tracing::instrument(skip_all, fields(
@@ -46,21 +46,9 @@ pub async fn handle(ctx: &ShardContext, interaction: Interaction) -> Result<()> 
     command.guild_id = ?data.guild_id,
 ))]
 async fn handle_command(
-    ctx: &ShardContext,
+    _ctx: &ShardContext,
     data: CommandData,
-    interaction: Interaction,
+    _interaction: Interaction,
 ) -> Result<()> {
-    let ctx = CommandContext::new(ctx.bot.clone(), &interaction, data, ctx);
-    match ctx.interaction.kind {
-        InteractionType::ApplicationCommand => {
-            // update it into the actual one
-            let span = tracing::Span::current();
-            span.record("command.name", tracing::field::display(ctx.command_name()));
-            interaction::commands::handle(ctx).await?;
-        }
-        unknown => {
-            warn!("got unimplemented {unknown:?} interaction type");
-        }
-    };
-    Ok(())
+    todo!()
 }

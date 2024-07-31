@@ -7,7 +7,6 @@ pub use self::shard::ShardContext;
 
 pub mod error;
 pub mod events;
-pub mod interaction;
 pub mod settings;
 pub mod shard;
 pub mod tasks;

@@ -1,3 +1,4 @@
+#[allow(unused)]
 use eden_tasks::Scheduled;
 use futures::future::select;
 use tokio::sync::mpsc;
@@ -57,22 +58,23 @@ pub async fn observe_shards(
             !has_registered_commands && matches!(message, ShardObserverMessage::Ready(..));
 
         if should_register_commands {
-            let result = crate::interaction::commands::register_commands(&bot).await;
-            let Err(error) = result else {
-                continue;
-            };
-            tracing::warn!(%error, "failed to register slash commands");
+            todo!()
+            // let result = crate::interaction::commands::register_commands(&bot).await;
+            // let Err(error) = result else {
+            //     continue;
+            // };
+            // tracing::warn!(%error, "failed to register slash commands");
 
-            // register commands for 5 minutes, maybe we're rate limited
-            let result = bot
-                .queue
-                .schedule(crate::tasks::RegisterCommands, Scheduled::in_minutes(5))
-                .await;
+            // // register commands for 5 minutes, maybe we're rate limited
+            // let result = bot
+            //     .queue
+            //     .schedule(crate::tasks::RegisterCommands, Scheduled::in_minutes(5))
+            //     .await;
 
-            if let Err(error) = result {
-                let error = error.anonymize();
-                tracing::warn!(%error, "failed to schedule to register commands for later");
-            }
+            // if let Err(error) = result {
+            //     let error = error.anonymize();
+            //     tracing::warn!(%error, "failed to schedule to register commands for later");
+            // }
         }
     }
 }
