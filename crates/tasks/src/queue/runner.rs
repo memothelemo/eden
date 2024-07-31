@@ -423,7 +423,7 @@ where
     S: Clone + Send + Sync + 'static,
 {
     let max_tasks = queue.0.config.concurrency;
-    tracing::info!("started background queue process with {max_tasks} max running tasks");
+    tracing::info!("started background queue process with maximum of {max_tasks} running tasks");
 
     // this is prevent from Eden's scheduler system to request
     // from the database multiple times. run them one at a time

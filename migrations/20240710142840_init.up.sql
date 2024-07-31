@@ -30,6 +30,7 @@ CREATE TABLE admins (
 
     CONSTRAINT non_empty_name CHECK(length("name") > 0)
 );
+SELECT manage_updated_at('admins');
 
 CREATE TABLE payers (
     "id" BIGINT PRIMARY KEY NOT NULL,

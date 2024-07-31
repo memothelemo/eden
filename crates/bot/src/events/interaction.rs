@@ -1,10 +1,10 @@
 // use crate::interaction::{s};
-use crate::shard::ShardContext;
+use crate::{interaction::cmds::CommandContext, shard::ShardContext};
 
 use eden_utils::Result;
 use tracing::warn;
 use twilight_model::application::interaction::{
-    application_command::CommandData, Interaction, InteractionData,
+    application_command::CommandData, Interaction, InteractionData, InteractionType,
 };
 
 #[tracing::instrument(skip_all, fields(
@@ -14,7 +14,7 @@ use twilight_model::application::interaction::{
     interaction.is_guild = ?interaction.is_guild(),
     interaction.locale = ?interaction.locale,
 ))]
-pub async fn handle(ctx: &ShardContext, interaction: Interaction) -> Result<()> {
+pub async fn handle(shard: &ShardContext, interaction: Interaction) -> Result<()> {
     let Some(data) = &interaction.data else {
         tracing::warn!("got interaction with no data");
         return Ok(());
@@ -24,7 +24,7 @@ pub async fn handle(ctx: &ShardContext, interaction: Interaction) -> Result<()> 
     let result = match data {
         InteractionData::ApplicationCommand(data) => {
             let data = *data.clone();
-            handle_command(ctx, data, interaction).await
+            handle_command(shard, data, interaction).await
         }
         _ => {
             warn!("got unimplemented {kind:?} interaction type");
@@ -46,9 +46,22 @@ pub async fn handle(ctx: &ShardContext, interaction: Interaction) -> Result<()> 
     command.guild_id = ?data.guild_id,
 ))]
 async fn handle_command(
-    _ctx: &ShardContext,
+    shard: &ShardContext,
     data: CommandData,
-    _interaction: Interaction,
+    interaction: Interaction,
 ) -> Result<()> {
-    todo!()
+    let ctx = CommandContext::new(shard.bot.clone(), data, &interaction, shard);
+    match ctx.interaction.kind {
+        InteractionType::ApplicationCommand => {
+            let span = tracing::Span::current();
+            if !span.is_disabled() {
+                span.record("command.name", tracing::field::display(ctx.command_name()));
+            }
+            crate::interaction::cmds::handle(ctx).await?;
+        }
+        unknown => {
+            warn!("got unimplemented {unknown:?} interaction type");
+        }
+    }
+    Ok(())
 }

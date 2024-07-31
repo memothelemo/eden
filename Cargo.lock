@@ -664,6 +664,7 @@ dependencies = [
  "chrono",
  "config",
  "doku",
+ "eden-bot-definitions",
  "eden-db",
  "eden-tasks",
  "eden-utils",
@@ -688,6 +689,16 @@ dependencies = [
  "twilight-mention",
  "twilight-model",
  "twilight-util",
+]
+
+[[package]]
+name = "eden-bot-definitions"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "eden-utils",
+ "once_cell",
+ "twilight-interactions",
+ "twilight-model",
 ]
 
 [[package]]

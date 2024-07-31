@@ -12,6 +12,7 @@ pub struct TaskRegistryMeta<S> {
     pub(crate) kind: &'static str,
     pub(crate) is_periodic: bool,
     pub(crate) priority: PriorityFn,
+    pub(crate) is_temporary: bool,
 }
 
 pub type DeserializerFn<S> = Box<
@@ -69,6 +70,7 @@ where
             kind: T::task_type(),
             is_periodic: T::schedule().is_periodic(),
             priority: Box::new(T::priority),
+            is_temporary: T::temporary(),
         };
 
         if T::schedule().is_periodic() {

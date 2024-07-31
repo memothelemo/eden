@@ -8,6 +8,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+eden-bot-definitions = { path = "./definitions" }
 eden-db.workspace = true
 eden-tasks.workspace = true
 eden-utils.workspace = true

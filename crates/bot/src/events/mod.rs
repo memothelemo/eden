@@ -4,6 +4,7 @@ use twilight_gateway::{Event, EventTypeFlags, Intents};
 
 use crate::shard::ShardContext;
 
+pub mod guild_create;
 pub mod interaction;
 pub mod ready;
 
@@ -14,6 +15,7 @@ pub(crate) const SHOULD_CACHE: ResourceType = ResourceType::GUILD
 
 pub(crate) const INTENTS: Intents = Intents::GUILDS
     .union(Intents::DIRECT_MESSAGES)
+    .union(Intents::GUILD_MEMBERS)
     .union(Intents::GUILD_MESSAGES);
 
 pub(crate) const FILTERED_EVENT_TYPES: EventTypeFlags = EventTypeFlags::READY
@@ -23,23 +25,21 @@ pub(crate) const FILTERED_EVENT_TYPES: EventTypeFlags = EventTypeFlags::READY
     .union(EventTypeFlags::GUILD_CREATE);
 
 #[tracing::instrument(skip_all, fields(
-    ctx.latency = ?ctx.recent_latency(),
+    ctx.latency = ?shard.recent_latency(),
     guild.id = ?event.guild_id(),
     event.kind = ?event.kind(),
-    shard.id = %ctx.shard_id,
+    shard.id = %shard.id,
 ))]
-pub async fn handle_event(ctx: ShardContext, event: Event) {
+pub async fn handle_event(shard: ShardContext, event: Event) {
     let event_kind = event.kind();
     let result: Result<()> = match event {
-        Event::InteractionCreate(data) => self::interaction::handle(&ctx, data.0).await,
-        Event::Ready(data) => self::ready::handle(&ctx, &data).await,
+        Event::GuildCreate(data) => self::guild_create::handle(&shard, data.0).await,
+        Event::InteractionCreate(data) => self::interaction::handle(&shard, data.0).await,
+        Event::Ready(data) => self::ready::handle(&shard, &data).await,
         Event::Resumed => {
             tracing::debug!("shard resumed gateway session");
             Ok(())
         }
-
-        // needed for caching
-        Event::GuildCreate(..) => Ok(()),
         _ => {
             tracing::warn!("received unimplemented {event_kind:?} event");
             Ok(())

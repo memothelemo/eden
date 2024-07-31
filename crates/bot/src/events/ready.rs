@@ -8,12 +8,12 @@ use crate::shard::ShardContext;
     data.guilds.len = %data.guilds.len(),
     %data.version,
 ))]
-pub async fn handle(ctx: &ShardContext, data: &Ready) -> Result<()> {
+pub async fn handle(shard: &ShardContext, data: &Ready) -> Result<()> {
     tracing::debug!("shard is ready");
 
     let actual_id = data.application.id;
-    let configured_id = ctx.bot.settings.bot.application_id;
-    let expected_id = ctx.bot.application_id.get().cloned().or(configured_id);
+    let configured_id = shard.bot.settings.bot.application_id;
+    let expected_id = shard.bot.application_id.get().cloned().or(configured_id);
 
     let same_as_configured = expected_id.map(|v| v == actual_id).unwrap_or(true);
     if !same_as_configured {
@@ -24,7 +24,7 @@ pub async fn handle(ctx: &ShardContext, data: &Ready) -> Result<()> {
         );
 
         // take it first heheheh
-        if ctx.bot.application_id.set(actual_id).is_err() {
+        if shard.bot.application_id.set(actual_id).is_err() {
             tracing::warn!("could not replace new application ID");
         }
     }

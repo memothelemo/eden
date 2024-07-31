@@ -7,6 +7,7 @@ pub use self::shard::ShardContext;
 
 pub mod error;
 pub mod events;
+pub mod interaction;
 pub mod settings;
 pub mod shard;
 pub mod tasks;
@@ -33,13 +34,6 @@ pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
             .await
             .attach_printable(format!("could not fetch bot information"))?;
     }
-
-    // To avoid sending multiple register command requests to Discord
-    tracing::debug!("clearing queued register command tasks");
-    bot.queue
-        .clear_all_with::<tasks::RegisterCommands>()
-        .await
-        .change_context(StartBotError)?;
 
     bot.queue.start().await.change_context(StartBotError)?;
 

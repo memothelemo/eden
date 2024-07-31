@@ -106,11 +106,14 @@ impl Bot {
 #[derive(Debug, Deserialize, Document, Serialize)]
 pub struct Guild {
     /// Whether Eden allows guild administrators (who have ADMINISTRATOR permission)
-    /// to register themselves as payers without the approval of other guild
-    /// administrators.
+    /// or any members to register themselves as payers without the approval of other
+    /// guild administrators.
     ///
-    /// If this option is disabled, the guild administrator must wait for any
-    /// guild administrators to approve their registration.
+    /// If this option is disabled, the guild administrator or member must wait
+    /// for any guild administrators to approve their registration.
+    ///
+    /// Self-registration restriction extemption will be applied to the
+    /// local guild owner only.
     ///
     /// You should allow self-registration if there's only you or one guild
     /// administrators in your chosen guild. Otherwise, it is recommended to

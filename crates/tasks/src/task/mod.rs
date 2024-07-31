@@ -64,6 +64,18 @@ pub trait Task: Debug + Send + Sync + 'static {
         TaskSchedule::Once
     }
 
+    /// Whether this task is temporary and lasts until the queue is shutted down.
+    ///
+    /// If the queue starts again, the task will be deleted indefinitely.
+    ///
+    /// It defaults to `false`.
+    fn temporary() -> bool
+    where
+        Self: Sized,
+    {
+        false
+    }
+
     /// The delay before a task is processed again after an error.
     ///
     /// It starts with 1 minute, then 2 minutes and so on.

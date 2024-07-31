@@ -117,25 +117,7 @@ where
     where
         T: AnyTask<State = S>,
     {
-        let kind = T::task_type();
-        tracing::info!(?kind, "clearing all queued tasks with filtered type");
-
-        let mut conn = self
-            .db_transaction()
-            .await
-            .transform_context(ClearAllTasksError)?;
-
-        let deleted = Task::delete_all_with_type(&mut conn, kind)
-            .await
-            .change_context(ClearAllTasksError)
-            .attach_printable_lazy(|| format!("with type: {kind:?}"))?;
-
-        conn.commit()
-            .await
-            .change_context(ClearAllTasksError)
-            .attach_printable("could not commit database transaction")?;
-
-        Ok(deleted)
+        self.clear_all_with_internal(T::task_type(), true).await
     }
 
     pub async fn delete_queued_task(&self, id: Uuid) -> Result<bool, DeleteTaskError> {
@@ -248,6 +230,11 @@ where
                 .attach_printable("already started processing incoming tasks");
         }
 
+        self.clear_any_temporary_tasks()
+            .await
+            .transform_context(StartQueueError)
+            .attach_printable("could not clear all temporary tasks")?;
+
         self.update_periodic_tasks_blacklist()
             .await
             .transform_context(StartQueueError)
@@ -293,6 +280,61 @@ where
             .await
             .anonymize_error()
             .attach_printable("unable to start transaction from the database")
+    }
+
+    async fn clear_all_with_internal(
+        &self,
+        kind: &'static str,
+        is_direct: bool,
+    ) -> Result<u64, ClearAllTasksError> {
+        if is_direct {
+            tracing::info!(?kind, "clearing all queued tasks with filtered type");
+        } else {
+            tracing::debug!(?kind, "clearing all queued tasks with filtered type");
+        }
+
+        let mut conn = self
+            .db_transaction()
+            .await
+            .transform_context(ClearAllTasksError)?;
+
+        let deleted = Task::delete_all_with_type(&mut conn, kind)
+            .await
+            .change_context(ClearAllTasksError)
+            .attach_printable_lazy(|| format!("with type: {kind:?}"))?;
+
+        conn.commit()
+            .await
+            .change_context(ClearAllTasksError)
+            .attach_printable("could not commit database transaction")?;
+
+        Ok(deleted)
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn clear_any_temporary_tasks(&self) -> Result<()> {
+        tracing::debug!("clearing temporary tasks");
+
+        let mut total = 0;
+        for entry in self.0.registry.iter() {
+            let metadata = entry.value();
+            if !metadata.is_temporary {
+                continue;
+            }
+
+            tracing::trace!("clearing {:?} related tasks", metadata.kind);
+            let amount = self
+                .clear_all_with_internal(metadata.kind, false)
+                .await
+                .attach_printable_lazy(|| {
+                    format!("tried to clear tasks for {:?}", metadata.kind)
+                })?;
+
+            total += amount;
+        }
+
+        tracing::debug!("removed {total} temporary tasks");
+        Ok(())
     }
 
     async fn update_periodic_tasks_blacklist(&self) -> Result<()> {

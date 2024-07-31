@@ -16,7 +16,7 @@ impl Task for BillPayer {
     where
         Self: Sized,
     {
-        "bill_payer"
+        "payer::bill"
     }
 
     async fn perform(&self, _info: &TaskPerformInfo, _state: Self::State) -> Result<TaskResult> {

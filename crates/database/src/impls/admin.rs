@@ -73,6 +73,27 @@ impl Admin {
         .change_context(QueryError)
         .attach_printable("could not insert admin")
     }
+
+    pub async fn upsert(
+        conn: &mut sqlx::PgConnection,
+        form: InsertAdminForm<'_>,
+    ) -> Result<Option<Self>, QueryError> {
+        sqlx::query_as::<_, Admin>(
+            r"INSERT INTO admins(id, name)
+            VALUES ($1, $2)
+            ON CONFLICT (id)
+                DO UPDATE
+                    SET name = $2
+                    WHERE admins.name != EXCLUDED.name
+            RETURNING *",
+        )
+        .bind(SqlSnowflake::new(form.id))
+        .bind(form.name)
+        .fetch_optional(conn)
+        .await
+        .change_context(QueryError)
+        .attach_printable("could not insert admin")
+    }
 }
 
 #[allow(clippy::unwrap_used, clippy::unreadable_literal)]
@@ -129,6 +150,34 @@ mod tests {
             .anonymize_error()?;
 
         assert_eq!(new_admin.name, Some("superman".into()));
+        Ok(())
+    }
+
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn test_upsert(pool: sqlx::PgPool) -> eden_utils::Result<()> {
+        let mut conn = pool.acquire().await.anonymize_error()?;
+        let admin = crate::test_utils::generate_admin(&mut conn).await?;
+
+        let form = InsertAdminForm::builder()
+            .id(admin.id)
+            .name(Some("superman"))
+            .build();
+
+        let admin = Admin::upsert(&mut conn, form).await.anonymize_error()?;
+        assert!(admin.is_some());
+
+        let admin = admin.unwrap();
+        assert_eq!(admin.name, Some("superman".into()));
+
+        // same properties
+        let form = InsertAdminForm::builder()
+            .id(admin.id)
+            .name(Some("superman"))
+            .build();
+
+        let result = Admin::upsert(&mut conn, form).await.anonymize_error()?;
+        assert!(result.is_none());
+
         Ok(())
     }
 
