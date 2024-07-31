@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use thiserror::Error;
 use tracing::warn;
-use twilight_model::channel::message::{AllowedMentions, MessageFlags};
+use twilight_model::channel::message::{AllowedMentions, Embed, MessageFlags};
 use twilight_model::guild::{PartialMember, Permissions};
 use twilight_model::http::interaction::{
     InteractionResponse, InteractionResponseData, InteractionResponseType,
@@ -58,6 +58,18 @@ impl<'shard_ctx, T> InteractionContext<'shard_ctx, T> {
         self.send_response(Some(data.build()), kind)
             .await
             .attach_printable("could not respond with deferred message")
+    }
+
+    pub async fn respond_with_embed(&self, embed: Embed, ephemeral: bool) -> Result<()> {
+        let mut data = self.build_response().embeds(vec![embed]);
+        if ephemeral {
+            data = data.flags(MessageFlags::EPHEMERAL);
+        }
+
+        let kind = InteractionResponseType::DeferredChannelMessageWithSource;
+        self.send_response(Some(data.build()), kind)
+            .await
+            .attach_printable("could not respond with embed")
     }
 
     pub async fn respond(&self, data: InteractionResponseData) -> Result<()> {

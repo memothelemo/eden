@@ -62,7 +62,6 @@ pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
     }
 
     let name = ctx.command_name();
-
     let input: CommandInputData<'_> = ctx.data.clone().into();
     let result = match_commands!(ctx, input, [cmds::Ping, cmds::local_guild::PayerCommand]);
 

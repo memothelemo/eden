@@ -54,7 +54,7 @@ impl Payer {
         )
         .bind(form.name)
         .bind(SqlSnowflake::new(id))
-        .fetch_optional(&mut *conn)
+        .fetch_optional(conn)
         .await
         .change_context(QueryError)
         .attach_printable("could not update payer")
@@ -97,17 +97,21 @@ impl Payer {
             std::string::ToString::to_string,
         );
 
-        Identity::insert(
-            &mut *conn,
-            InsertIdentityForm::builder()
-                .payer_id(form.id)
-                .name(Some(&bedrock_username))
-                .uuid(None)
-                .build(),
-        )
-        .await
-        .change_context(QueryError)
-        .attach_printable("could not insert bedrock identity for a payer")?;
+        // Hang on! Let's check if it is the same as Java because Postgres
+        // will throw us a unique constraint violation error otherwise don't.
+        if bedrock_username != form.java_username {
+            Identity::insert(
+                &mut *conn,
+                InsertIdentityForm::builder()
+                    .payer_id(form.id)
+                    .name(Some(&bedrock_username))
+                    .uuid(None)
+                    .build(),
+            )
+            .await
+            .change_context(QueryError)
+            .attach_printable("could not insert bedrock identity for a payer")?;
+        }
 
         Ok(payer)
     }
@@ -172,6 +176,42 @@ mod tests {
 
         let new_info = new_info.unwrap();
         assert_eq!(new_info.name, new_name);
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn test_insert_with_same_username_both_editions(
+        pool: sqlx::PgPool,
+    ) -> eden_utils::Result<()> {
+        let mut conn = pool.acquire().await.anonymize_error()?;
+
+        let id = Id::new(2345678);
+        let name = "foo";
+
+        let username = "foo123";
+        let form = InsertPayerForm::builder()
+            .id(id)
+            .name(name)
+            .java_username(username)
+            .bedrock_username(Some(&username))
+            .build();
+
+        let payer = Payer::insert(&mut conn, form).await.anonymize_error()?;
+        assert_eq!(payer.id, id);
+        assert_eq!(payer.name, name);
+
+        let identities = Identity::get_all(payer.id)
+            .next(&mut conn)
+            .await
+            .anonymize_error()?
+            .unwrap();
+
+        assert_eq!(identities.len(), 1);
+
+        let identity = identities.first().unwrap();
+        assert_eq!(identity.name, Some(username.into()));
+        assert_eq!(identity.uuid, None);
 
         Ok(())
     }

@@ -7,11 +7,30 @@ use twilight_model::id::marker::UserMarker;
 use twilight_model::id::Id;
 
 use crate::forms::{
-    InsertAdminForm, InsertBillForm, InsertIdentityForm, InsertPayerForm, InsertPaymentForm,
-    InsertTaskForm,
+    InsertAdminForm, InsertBillForm, InsertIdentityForm, InsertPayerApplicationForm,
+    InsertPayerForm, InsertPaymentForm, InsertTaskForm,
 };
 use crate::payment::{PaymentData, PaymentMethod};
-use crate::schema::{Admin, Bill, Identity, Payer, Payment, Task, TaskPriority, TaskRawData};
+use crate::schema::{
+    Admin, Bill, Identity, Payer, PayerApplication, Payment, Task, TaskPriority, TaskRawData,
+};
+
+pub async fn generate_payer_application(conn: &mut sqlx::PgConnection) -> Result<PayerApplication> {
+    let user_id = Id::new(12345678);
+    let name = "poopyy";
+    let java_username = "fooooo";
+    let answer = "I like strawberry pies";
+
+    let form = InsertPayerApplicationForm::builder()
+        .user_id(user_id)
+        .name(&name)
+        .java_username(java_username)
+        .bedrock_username(None)
+        .answer(answer)
+        .build();
+
+    PayerApplication::insert(conn, form).await.anonymize_error()
+}
 
 pub async fn generate_task(conn: &mut sqlx::PgConnection) -> Result<Task> {
     let form = InsertTaskForm::builder()

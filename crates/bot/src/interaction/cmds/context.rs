@@ -16,9 +16,10 @@ impl<'a> CommandContext<'a> {
                 CommandOptionValue::SubCommand(..) => {
                     write!(&mut output, " {}", option.name).expect("could not push string");
                 }
-                CommandOptionValue::SubCommandGroup(..) => {
+                CommandOptionValue::SubCommandGroup(value) => {
                     // TODO: Form a name from subcommand group
-                    dbg!(&option.name, &option.value);
+                    let value = value.first().map(|v| v.name.as_str()).unwrap_or("");
+                    write!(&mut output, " {} {value}", option.name).expect("could not push string");
                 }
                 _ => {}
             }

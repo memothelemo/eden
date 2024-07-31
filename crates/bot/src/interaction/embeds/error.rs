@@ -11,10 +11,11 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 use crate::Bot;
 
 // TODO: Implement id based interactions so I can diagnose errors faster
+#[must_use]
 pub fn custom(title: impl Display, now: Option<DateTime<Utc>>) -> EmbedBuilder {
     let mut builder = EmbedBuilder::new()
-        .title(format!("🔴  {title}"))
-        .color(0xE83A27);
+        .title(format!("❌  {title}"))
+        .color(super::colors::RED);
 
     // twilight uses 'time' while Eden uses 'chrono'
     if let Some(now) = now {
@@ -31,6 +32,7 @@ pub fn custom(title: impl Display, now: Option<DateTime<Utc>>) -> EmbedBuilder {
     builder
 }
 
+#[must_use]
 pub fn internal_error(
     ctx: &Bot,
     error: &eden_utils::Error,

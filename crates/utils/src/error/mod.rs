@@ -5,6 +5,7 @@ mod into_impls;
 
 pub use self::category::*;
 pub use self::ext::*;
+pub mod sql;
 
 pub use error_stack::Context;
 
@@ -148,6 +149,13 @@ impl<T: Context> Error<T> {
         self.report.request_ref::<T>().next().is_some()
     }
 
+    pub fn downcast_ref<N>(&self) -> Option<&N>
+    where
+        N: Send + Sync + 'static,
+    {
+        self.report.downcast_ref::<N>()
+    }
+
     pub fn get_attached<N>(&self) -> RequestRef<'_, N>
     where
         N: ?Sized + Send + Sync + 'static,
@@ -157,6 +165,13 @@ impl<T: Context> Error<T> {
 }
 
 impl Error {
+    pub fn downcast_ref_any<T>(&self) -> Option<&T>
+    where
+        T: Send + Sync + 'static,
+    {
+        self.report.downcast_ref::<T>()
+    }
+
     pub fn get_attached_any<N>(&self) -> RequestRef<'_, N>
     where
         N: ?Sized + Send + Sync + 'static,
