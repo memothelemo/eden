@@ -27,6 +27,23 @@ pub struct Settings {
     #[serde(skip)]
     #[doku(skip)]
     pub(crate) path: Option<PathBuf>,
+
+    /// How many CPU threads which Eden will utilize.
+    ///
+    /// The good rule of thumb when setting the amount of CPU threads
+    /// is ideally you want to have it at least 2 cores (one for the gateway
+    /// and one for the task queueing system).
+    ///
+    /// Unless, if you want to start Eden instance with many shards to or your bot
+    /// needs to cater a lot of members in your guild/server, you may want to adjust
+    /// it up to 4 to 8.
+    ///
+    /// The default if not set is the total actual amount of your CPU cores
+    /// divided by 2 (spare for the operating system). If the CPU however, is a single
+    /// core, it will utilize one core only.
+    #[doku(example = "2")]
+    #[serde(default = "Settings::default_workers")]
+    pub(crate) workers: usize,
 }
 
 impl Settings {
@@ -124,12 +141,21 @@ impl Settings {
     }
 
     #[must_use]
+    pub fn workers(&self) -> usize {
+        self.workers
+    }
+
+    #[must_use]
     pub fn path(&self) -> Option<&Path> {
         self.path.as_deref()
     }
 }
 
 impl Settings {
+    fn default_workers() -> usize {
+        (num_cpus::get_physical() / 2).max(1)
+    }
+
     fn resolve_alternative_vars(
         mut builder: ConfigBuilder<config::builder::DefaultState>,
     ) -> EdenResult<ConfigBuilder<config::builder::DefaultState>> {

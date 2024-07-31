@@ -99,7 +99,11 @@ async fn create_shards(bot: &Bot) -> Result<Vec<Shard>, StartBotError> {
 
 async fn init_all_shards(bot: Bot, shards: Vec<Shard>) -> Result<(), StartBotError> {
     #[cfg(not(release))]
-    tracing::info!("starting bot with {} shards", shards.len());
+    tracing::info!(
+        "starting bot with {} shard(s) and {} worker(s)",
+        shards.len(),
+        bot.settings.workers
+    );
 
     #[cfg(release)]
     println!("Starting bot with {} shards", shards.len());

@@ -25,8 +25,9 @@ pub struct Bot {
     /// A list of developers who have special privileges to Eden unlike
     /// standard users. Special privileges include:
     ///
-    /// - Able to see the entire error of why it isn't working.
+    /// - They can able to see the entire error of why it isn't working.
     #[doku(as = "Vec<String>", example = "[\"876711213126520882\"]")]
+    #[serde(default)]
     pub(crate) developers: Vec<Id<UserMarker>>,
 
     /// Parameters for configuring what Eden should behave when
@@ -167,23 +168,8 @@ pub enum Sharding {
         /// Total amount of shards needed/should connect to Discord gateway.
         #[doku(as = "u64", example = "5")]
         total: NonZeroU64,
-        // /// How many shards can successfully connect per 5 seconds.
-        // ///
-        // /// If you don't know what to set, it is recommended to set this
-        // /// to 1 (default value). It means that every 1 shard will successfully
-        // /// connect to Discord at a time per 5 seconds.
-        // #[serde(default = "Sharding::default_concurrency")]
-        // #[doku(as = "u64", example = "1")]
-        // concurrency: NonZeroU64,
     },
 }
-
-// impl Sharding {
-//     #[allow(clippy::unwrap_used)]
-//     fn default_concurrency() -> NonZeroU64 {
-//         NonZeroU64::new(1).unwrap()
-//     }
-// }
 
 impl Default for Sharding {
     fn default() -> Self {

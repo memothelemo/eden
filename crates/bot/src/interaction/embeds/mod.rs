@@ -57,8 +57,13 @@ pub fn internal_error(
 
         // Print the error and split each part per 4000
         // characters (96 characters away from max on Discord)
-        let chunks = error
-            .to_string()
+        let output = error.to_string();
+
+        // Output includes some of ANSI escape sequences since tracing_error
+        // renders out the span trace by using the global subscriber set
+        // from tracing crate.
+        let output = strip_ansi_escapes::strip_str(output);
+        let chunks = output
             .chars()
             .chunks(4000)
             .into_iter()

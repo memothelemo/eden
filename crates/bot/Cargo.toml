@@ -29,6 +29,8 @@ tracing.workspace = true
 config = { version = "0.14.0", features = ["convert-case", "preserve_order", "toml"], default-features = false }
 doku = "0.21.1"
 itertools = "0.13.0"
+num_cpus = "1.16.0"
+strip-ansi-escapes = "0.2.0"
 
 # twilight crates
 twilight-cache-inmemory = { version = "0.15.4", features = ["permission-calculator"] }

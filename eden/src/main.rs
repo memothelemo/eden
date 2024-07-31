@@ -29,6 +29,7 @@ fn start() -> eden_utils::Result<()> {
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
+        .worker_threads(settings.workers())
         .build()
         .unwrap()
         .block_on(bootstrap(settings))

@@ -31,7 +31,7 @@ Y88888P Y8888D' Y88888P VP   V8P
         "{}:\t{} ({})",
         header.paint("Version"),
         env!("CARGO_PKG_VERSION"),
-        BUILD.build_profile
+        BUILD.commit_branch
     );
     eprintln!("{}:\t{}", header.paint("Commit hash"), BUILD.commit_hash);
     eprintln!("{}:\t{}", header.paint("Commit date"), BUILD.commit_date);
@@ -50,6 +50,7 @@ Y88888P Y8888D' Y88888P VP   V8P
             false => disabled_color.paint("disabled"),
         }
     );
+    eprintln!("{}:\t{}", header.paint("Workers"), settings.workers());
 
     eprintln!();
 }
