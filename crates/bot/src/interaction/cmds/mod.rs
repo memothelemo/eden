@@ -40,7 +40,21 @@ async fn handle_command<'a, T: CommandModel + RunCommand>(
         format!("could not parse {:?} command from interaction", T::NAME)
     })?;
 
-    // TODO: Check guild permissions. I guess...
+    if ctx.data.guild_id.is_some() {
+        // let guild_ctx = super::LocalGuildContext::from_ctx(ctx)?;
+        // let required_permissions = command.guild_permissions();
+        // let bot_permissions = guild_ctx.bot_permissions().await?;
+
+        // let missing_permissions = required_permissions.difference(bot_permissions);
+        // if !missing_permissions.is_empty() {
+        //     let embed = embeds::error::custom("Missing permissions", None)
+        //         .description(format!("I cannot run this command because I lack {missing_permissions:?} permissions. Please enable this for me and try again"))
+        //         .build();
+
+        //     return ctx.respond_with_embed(embed, true).await;
+        // }
+    }
+
     command
         .run(ctx)
         .await

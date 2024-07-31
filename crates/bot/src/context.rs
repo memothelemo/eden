@@ -7,6 +7,8 @@ use std::{fmt::Debug, mem::MaybeUninit, ops::Deref, sync::Arc};
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_http::client::InteractionClient;
 use twilight_http::Client as HttpClient;
+use twilight_model::id::marker::ApplicationMarker;
+use twilight_model::id::Id;
 
 use crate::Settings;
 
@@ -89,6 +91,14 @@ impl Bot {
 }
 
 impl Bot {
+    #[must_use]
+    pub fn application_id(&self) -> Id<ApplicationMarker> {
+        match self.application_id.get().copied() {
+            Some(n) => n,
+            None => panic!("tried to call bot.application_id while the bot is not ready"),
+        }
+    }
+
     #[must_use]
     pub fn is_cache_enabled(&self) -> bool {
         self.0.settings.bot.http.use_cache

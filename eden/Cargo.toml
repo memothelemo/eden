@@ -21,6 +21,7 @@ tracing.workspace = true
 tracing-error.workspace = true
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
+clap = { version = "4.5.11", features = ["derive"] }
 
 [lints]
 workspace = true
