@@ -11,10 +11,6 @@ rust-version = "1.79.0"
 
 [workspace.dependencies]
 # eden crates
-eden-bot = { path = "crates/bot" }
-eden-db = { path = "crates/database" }
-eden-tasks = { path = "crates/tasks" }
-eden-utils = { path = "crates/utils" }
 
 # types
 chrono = { version = "0.4.38", features = ["serde"] }

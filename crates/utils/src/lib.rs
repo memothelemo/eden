@@ -1,15 +1,14 @@
-mod internal;
-mod sensitive;
-mod suggestion;
+pub fn add(left: u64, right: u64) -> u64 {
+    left + right
+}
 
-pub mod build;
-pub mod env;
-pub mod error;
-pub mod hash;
-pub mod serial;
-pub mod shutdown;
-pub mod time;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-pub use self::error::{Error, ErrorCategory, Result};
-pub use self::sensitive::*;
-pub use self::suggestion::*;
+    #[test]
+    fn it_works() {
+        let result = add(2, 2);
+        assert_eq!(result, 4);
+    }
+}
