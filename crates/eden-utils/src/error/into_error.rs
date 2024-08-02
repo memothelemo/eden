@@ -1,14 +1,14 @@
-use super::exts::{ErrorExt, ErrorExt2};
-use super::Error;
+use super::exts::{AnyErrorExt, ErrorExt};
+use super::{Error, ErrorCategory};
 
 use crate::env::LoadEnvError;
-use crate::ErrorCategory;
+use error_stack::Context;
 use thiserror::Error;
 
 /// This trait is applied with types that do not allow for implementation
 /// `impl From<Foo> for Error` or you want to have [`Error`] to have meaningful
 /// extra error information by using this trait.
-pub trait IntoAnyError {
+pub trait IntoAnonymizedError {
     /// Turns from any error into [`eden_utils::Error`](Error).
     ///
     /// Make sure to put `#[track_caller]` attribute on top of the
@@ -24,7 +24,7 @@ pub trait IntoAnyError {
 /// Unlike [`IntoAnyError`] where it returns an anonymized error,
 /// [`IntoError::into_eden_error`] only returns a typed error.
 pub trait IntoError {
-    type Context;
+    type Context: Context;
 
     /// Turns from any error into [`eden_utils::Error`](Error).
     ///
@@ -34,7 +34,7 @@ pub trait IntoError {
     fn into_eden_error(self) -> Error<Self::Context>;
 }
 
-impl IntoAnyError for std::io::Error {
+impl IntoAnonymizedError for std::io::Error {
     #[track_caller]
     fn into_eden_any_error(self) -> Error {
         #[derive(Debug, Error)]

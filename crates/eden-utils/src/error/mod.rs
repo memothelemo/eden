@@ -7,13 +7,15 @@ use tracing_error::SpanTrace;
 pub(crate) mod any;
 mod category;
 mod into_error;
+mod into_result;
 
 pub mod exts;
+pub mod prelude;
 pub mod tags;
 
 pub use self::category::*;
-pub use self::into_error::{IntoAnyError, IntoError};
 pub use ::error_stack::Context;
+
 pub type Result<T, E = self::any::AnonymizedError> = std::result::Result<T, Error<E>>;
 
 #[must_use]
@@ -243,7 +245,7 @@ where
     }
 }
 
-impl<C: IntoError> From<C> for Error<C::Context> {
+impl<C: self::into_error::IntoError> From<C> for Error<C::Context> {
     #[track_caller]
     fn from(value: C) -> Self {
         value.into_eden_error()

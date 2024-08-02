@@ -2,8 +2,7 @@ use sqlx::{postgres::PgArguments, QueryBuilder, Row};
 use std::result::Result as StdResult;
 
 use super::error::QueryError;
-use crate::error::exts::{IntoResult, ResultExtInto};
-use crate::error::Result;
+use crate::error::{exts::*, Result};
 
 #[must_use]
 pub struct Paginated<Q> {
@@ -85,7 +84,8 @@ impl<Q: PageQueyer> Paginated<Q> {
         let results = query
             .fetch_all(conn)
             .await
-            .change_context_into(QueryError)
+            .into_eden_error()
+            .change_context(QueryError)
             .attach_printable("could not paginate entries")?;
 
         let overall_total = results.first().map_or(0, |x| x.overall_total);

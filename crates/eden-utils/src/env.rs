@@ -2,7 +2,7 @@ use std::error::Error as StdError;
 use std::str::FromStr;
 use thiserror::Error;
 
-use crate::error::{exts::IntoResult, IntoError};
+use crate::error::exts::{IntoError, IntoTypedError, ResultExt};
 use crate::Result;
 
 #[derive(Debug, Error)]
@@ -35,6 +35,7 @@ where
     match value.parse() {
         Ok(n) => Ok(Some(n)),
         Err(error) => Err(error)
+            .into_typed_error()
             .change_context(LoadEnvError)
             .attach_printable(format!("could not parse value of {key:?} variable")),
     }
@@ -49,6 +50,7 @@ where
     match value.parse() {
         Ok(n) => Ok(n),
         Err(error) => Err(error)
+            .into_typed_error()
             .change_context(LoadEnvError)
             .attach_printable(format!("could not parse value of {key:?} variable")),
     }

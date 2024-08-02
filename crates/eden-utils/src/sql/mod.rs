@@ -11,8 +11,8 @@ use self::tags::DatabaseErrorType;
 use sqlx::error::ErrorKind;
 
 use crate::error::any::report_from_any_error;
-use crate::error::exts::ErrorExt2;
-use crate::error::{Error, ErrorCategory, IntoAnyError, IntoError};
+use crate::error::exts::{AnyErrorExt, IntoAnonymizedError, IntoError};
+use crate::error::{Error, ErrorCategory};
 
 impl IntoError for sqlx::Error {
     type Context = QueryError;
@@ -23,7 +23,7 @@ impl IntoError for sqlx::Error {
     }
 }
 
-impl IntoAnyError for sqlx::Error {
+impl IntoAnonymizedError for sqlx::Error {
     #[track_caller]
     fn into_eden_any_error(self) -> Error {
         let mut report = report_from_any_error(&self);
@@ -62,7 +62,7 @@ impl IntoAnyError for sqlx::Error {
 mod tests {
     use super::*;
 
-    use crate::error::exts::{IntoResult, ResultExtInto};
+    use crate::error::exts::{AnonymizeErrorInto, IntoTypedError};
     use crate::Result;
 
     async fn generate_result(conn: &mut sqlx::PgConnection) -> Result<()> {
@@ -76,7 +76,7 @@ mod tests {
 
     #[sqlx::test]
     async fn should_classify_as_unique_violation(pool: sqlx::PgPool) -> Result<()> {
-        let mut conn = pool.acquire().await.anonymize_error()?;
+        let mut conn = pool.acquire().await.into_typed_error()?;
 
         sqlx::query(
             r#"create table "__sample__" (
@@ -86,12 +86,12 @@ mod tests {
         )
         .execute(&mut *conn)
         .await
-        .anonymize_error()?;
+        .into_typed_error()?;
 
         sqlx::query(r#"insert into "__sample__" (name) values ('puppy');"#)
             .execute(&mut *conn)
             .await
-            .anonymize_error()?;
+            .into_typed_error()?;
 
         let result = sqlx::query(r#"insert into "__sample__" (name) values ('puppy')"#)
             .fetch_one(&mut *conn)
@@ -116,7 +116,7 @@ mod tests {
 
     #[sqlx::test]
     async fn should_classify_as_row_not_found(pool: sqlx::PgPool) -> Result<()> {
-        let mut conn = pool.acquire().await.anonymize_error()?;
+        let mut conn = pool.acquire().await.into_typed_error()?;
 
         sqlx::query(
             r#"create table "__sample__" (
@@ -126,7 +126,7 @@ mod tests {
         )
         .execute(&mut *conn)
         .await
-        .anonymize_error()?;
+        .into_typed_error()?;
 
         let result = sqlx::query(r#"select * from "__sample__""#)
             .fetch_one(&mut *conn)
