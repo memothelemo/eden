@@ -2,7 +2,7 @@ use std::error::Error as StdError;
 use std::str::FromStr;
 use thiserror::Error;
 
-use crate::error::{exts::ResultExt, IntoError};
+use crate::error::{exts::IntoResult, IntoError};
 use crate::Result;
 
 #[derive(Debug, Error)]

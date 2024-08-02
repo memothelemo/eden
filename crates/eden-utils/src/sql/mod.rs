@@ -62,7 +62,7 @@ impl IntoAnyError for sqlx::Error {
 mod tests {
     use super::*;
 
-    use crate::error::exts::{ResultExt, ResultExtInto};
+    use crate::error::exts::{IntoResult, ResultExtInto};
     use crate::Result;
 
     async fn generate_result(conn: &mut sqlx::PgConnection) -> Result<()> {

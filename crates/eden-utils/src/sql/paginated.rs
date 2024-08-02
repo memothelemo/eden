@@ -2,7 +2,7 @@ use sqlx::{postgres::PgArguments, QueryBuilder, Row};
 use std::result::Result as StdResult;
 
 use super::error::QueryError;
-use crate::error::exts::{ResultExt, ResultExtInto};
+use crate::error::exts::{IntoResult, ResultExtInto};
 use crate::error::Result;
 
 #[must_use]
