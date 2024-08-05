@@ -83,6 +83,7 @@ impl<T, C: Context, E: IntoError<Context = C>> IntoEdenResult for StdResult<T, E
     type Ok = T;
     type Error = C;
 
+    #[track_caller]
     fn into_eden_error(self) -> Result<T, C> {
         match self {
             Ok(value) => Ok(value),

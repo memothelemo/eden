@@ -43,7 +43,7 @@ CREATE TABLE payers (
 );
 SELECT manage_updated_at('payers');
 
-    -- stores either UUID or username data (both Bedrock and Java)
+-- stores either UUID or username data (both Bedrock and Java)
 CREATE TABLE identities (
     "id" BIGINT PRIMARY KEY NOT NULL GENERATED ALWAYS AS IDENTITY,
     "payer_id" BIGINT NOT NULL REFERENCES payers(id),

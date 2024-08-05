@@ -56,11 +56,11 @@ impl IntoError for (dotenvy::Error, &'static str) {
             dotenvy::Error::Io(n) => n.into_eden_any_error().change_context(LoadEnvError),
             dotenvy::Error::EnvVar(VarError::NotPresent) => {
                 Error::context(ErrorCategory::Unknown, LoadEnvError)
-                    .attach_printable(format!("{var:?} variable is required to set to run Eden",))
+                    .attach_printable(format!("{var:?} variable is required to set to run Eden"))
             }
             dotenvy::Error::EnvVar(VarError::NotUnicode(..)) => {
                 Error::context(ErrorCategory::Unknown, LoadEnvError)
-                    .attach_printable(format!("{var:?} variable must contai valid UTF-8 text",))
+                    .attach_printable(format!("{var:?} variable must contai valid UTF-8 text"))
             }
             _ => unimplemented!(),
         }

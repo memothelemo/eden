@@ -1,9 +1,19 @@
 use chrono::{DateTime, TimeDelta, Utc};
-use std::time::{Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 #[must_use]
 pub fn later(delta: TimeDelta) -> DateTime<Utc> {
     Utc::now() + delta
+}
+
+pub trait IntoStdDuration {
+    fn into_std_duration(self) -> Option<Duration>;
+}
+
+impl IntoStdDuration for TimeDelta {
+    fn into_std_duration(self) -> Option<Duration> {
+        self.to_std().or_else(|_| self.abs().to_std()).ok()
+    }
 }
 
 pub trait InstantExt {

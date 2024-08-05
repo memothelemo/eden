@@ -45,6 +45,16 @@ impl<Q: PageQueyer> Paginated<Q> {
         }
     }
 
+    #[allow(clippy::cast_possible_wrap)]
+    pub fn size(mut self, size: u64) -> Self {
+        // reset everything
+        self.prerun = false;
+        self.size = (size as i64).abs();
+        self.page = 0;
+        self.offset = Some(0);
+        self
+    }
+
     pub async fn next(
         &mut self,
         conn: &mut sqlx::PgConnection,

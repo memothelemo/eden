@@ -7,9 +7,17 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+eden-tasks.workspace = true
 eden-utils.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
+
+rand = "*"
+
+tracing.workspace = true
+tracing-error.workspace = true
+tracing-log = "0.2.0"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 
 [lints]
 workspace = true

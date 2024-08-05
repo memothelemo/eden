@@ -1,49 +1,85 @@
+use eden_tasks::prelude::*;
+use eden_tasks::worker::{Worker, WorkerId};
 use eden_utils::error::{exts::*, tags::Suggestion};
-use eden_utils::sql::SqlErrorExt;
-use eden_utils::{build, Result};
+use eden_utils::Result;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::str::FromStr;
-use std::time::Instant;
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(crate = "serde")]
+struct SampleTask;
+
+#[async_trait]
+impl Task for SampleTask {
+    type State = ();
+
+    fn kind() -> &'static str
+    where
+        Self: Sized,
+    {
+        "eden::sample_task"
+    }
+
+    fn trigger() -> TaskTrigger
+    where
+        Self: Sized,
+    {
+        TaskTrigger::None
+    }
+
+    async fn perform(&self, _ctx: &TaskRunContext, _state: Self::State) -> Result<TaskResult> {
+        Ok(TaskResult::Completed)
+    }
+}
 
 async fn bootstrap() -> Result<()> {
-    // let db_url = eden_utils::env::var("DATABASE_URL")?;
-    // let opts = PgConnectOptions::from_str(&db_url)
-    //     .into_typed_error()
-    //     .attach(Suggestion::new(
-    //         "Be sure that `DATABASE_URL` contains valid Postgres connection string",
-    //     ))?;
+    let db_url = eden_utils::env::var("DATABASE_URL")?;
+    let opts = PgConnectOptions::from_str(&db_url)
+        .into_typed_error()
+        .attach(Suggestion::new(
+            "Be sure that `DATABASE_URL` contains valid Postgres connection string",
+        ))?;
 
-    // let pool = PgPoolOptions::new()
-    //     .test_before_acquire(true)
-    //     .connect_with(opts)
-    //     .await
-    //     .anonymize_error_into()?;
+    let pool = PgPoolOptions::new()
+        .test_before_acquire(true)
+        .connect_with(opts)
+        .await
+        .anonymize_error_into()?;
 
-    // let result = sqlx::query("(")
-    //     .execute(&mut *pool.acquire().await.anonymize_error_into()?)
-    //     .await
-    //     .anonymize_error_into();
+    let worker = Worker::<()>::new(
+        WorkerId::ONE,
+        pool,
+        &eden_tasks::Settings::builder()
+            .max_running_tasks(100.try_into().unwrap())
+            .queued_tasks_per_batch(1_000.try_into().unwrap())
+            .build(),
+        (),
+    );
 
-    // if result.is_pool_error() {
-    //     println!("Oops!");
-    // }
+    let worker = worker.register_task::<SampleTask>();
+    worker.start().await?;
 
-    // result?;
+    eden_utils::shutdown::catch_signals().await;
+    worker.shutdown().await;
 
     Ok(())
 }
 
-#[allow(clippy::unwrap_used)]
-fn main() {
-    eden_utils::Error::init();
-
-    let result = tokio::runtime::Builder::new_multi_thread()
+fn start() -> Result<()> {
+    eden::logging::init()?;
+    tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .unwrap()
-        .block_on(bootstrap());
+        .into_typed_error()
+        .attach_printable("could not build tokio runtime")?
+        .block_on(bootstrap())
+}
 
-    if let Err(error) = result {
+#[allow(clippy::unwrap_used)]
+fn main() {
+    eden::logging::install_hooks();
+
+    if let Err(error) = start() {
         eprintln!("{error}");
         std::process::exit(1);
     }

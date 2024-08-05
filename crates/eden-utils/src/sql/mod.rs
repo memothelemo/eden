@@ -2,11 +2,12 @@ mod paginated;
 
 pub mod error;
 pub mod tags;
+pub mod util;
 
+pub use self::error::QueryError;
 pub use self::error::{SqlErrorExt, SqlResultExt};
 pub use self::paginated::*;
 
-use self::error::QueryError;
 use self::tags::DatabaseErrorType;
 use sqlx::error::ErrorKind;
 
