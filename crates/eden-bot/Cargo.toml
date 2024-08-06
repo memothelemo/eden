@@ -1,0 +1,17 @@
+[package]
+name = "eden-bot"
+description = "Implementation of Eden Discord bot."
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+eden-discord-types = { path = "../eden-discord-types" }
+eden-schema = { path = "../eden-schema" }
+eden-tasks.workspace = true
+eden-utils.workspace = true
+
+[lints]
+workspace = true
