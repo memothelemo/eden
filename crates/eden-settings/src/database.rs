@@ -5,9 +5,10 @@ use serde_with::serde_as;
 use sqlx::postgres::PgConnectOptions;
 use std::str::FromStr;
 use std::time::Duration as StdDuration;
+use typed_builder::TypedBuilder;
 
 #[serde_as]
-#[derive(Debug, Document, Deserialize, Serialize)]
+#[derive(Debug, Document, Deserialize, Serialize, TypedBuilder)]
 pub struct Database {
     /// Maximum amount of time to spend waiting for the database
     /// to successfully establish connection.
@@ -17,10 +18,11 @@ pub struct Database {
     /// the database.
     ///
     /// The default is `15` seconds, if not set.
+    #[builder(default = Database::default_connect_timeout())]
     #[doku(as = "String", example = "15s")]
     #[serde(default = "Database::default_connect_timeout")]
     #[serde_as(as = "eden_utils::serial::AsHumanDuration")]
-    pub(crate) connect_timeout: StdDuration,
+    pub connect_timeout: StdDuration,
 
     /// Maximum idle duration for individual pooled connections.
     ///
@@ -28,18 +30,20 @@ pub struct Database {
     /// will be closed.
     ///
     /// The default is `10` minutes, if not set.
+    #[builder(default = Database::default_idle_timeout())]
     #[doku(as = "String", example = "10m")]
     #[serde(default = "Database::default_idle_timeout")]
     #[serde_as(as = "eden_utils::serial::AsHumanDuration")]
-    pub(crate) idle_timeout: StdDuration,
+    pub idle_timeout: StdDuration,
 
     /// Maximum amount of connections for Eden to maintain it
     /// most of the time.
     ///
     /// The default is `10` connections, if not set.
+    #[builder(default = Database::default_max_connections())]
     #[doku(example = "10")]
     #[serde(default = "Database::default_max_connections")]
-    pub(crate) max_connections: u32,
+    pub max_connections: u32,
 
     /// Minimum amount of connections for Eden to maintain it
     /// at all times.
@@ -50,9 +54,21 @@ pub struct Database {
     /// capped to `max_connections`.
     ///
     /// The default is `0` connections, if not set.
+    #[builder(default = Database::default_min_connections())]
     #[doku(example = "0")]
     #[serde(default = "Database::default_min_connections")]
-    pub(crate) min_connections: u32,
+    pub min_connections: u32,
+
+    /// Maximum period of time that every transaction in the database
+    /// must be performed before it will cancel the transaction if it
+    /// exceeds the threshold.
+    ///
+    /// The default is `15` seconds, if not set.
+    #[builder(default = Database::default_query_timeout())]
+    #[doku(as = "String", example = "15s")]
+    #[serde(default = "Database::default_query_timeout")]
+    #[serde_as(as = "eden_utils::serial::AsHumanDuration")]
+    pub query_timeout: StdDuration,
 
     /// Connection URL to connect to the Postgres database.
     ///
@@ -66,26 +82,6 @@ pub struct Database {
 }
 
 impl Database {
-    #[must_use]
-    pub fn connect_timeout(&self) -> StdDuration {
-        self.connect_timeout
-    }
-
-    #[must_use]
-    pub fn idle_timeout(&self) -> StdDuration {
-        self.idle_timeout
-    }
-
-    #[must_use]
-    pub fn max_connections(&self) -> u32 {
-        self.max_connections
-    }
-
-    #[must_use]
-    pub fn min_connections(&self) -> u32 {
-        self.min_connections
-    }
-
     #[must_use]
     pub fn as_postgres_connect_options(&self) -> PgConnectOptions {
         self.url.as_ref().0.clone()
@@ -101,6 +97,10 @@ impl Database {
         StdDuration::from_secs(60 * 10)
     }
 
+    fn default_query_timeout() -> StdDuration {
+        StdDuration::from_secs(15)
+    }
+
     fn default_max_connections() -> u32 {
         10
     }
@@ -110,7 +110,36 @@ impl Database {
     }
 }
 
-struct SerializableUrl(PgConnectOptions);
+// to deal with private types stuff
+mod private {
+    use super::PgConnectOptions;
+    pub struct SerializableUrl(pub PgConnectOptions);
+}
+use self::private::SerializableUrl;
+
+impl FromStr for SerializableUrl {
+    type Err = sqlx::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(PgConnectOptions::from_str(s)?))
+    }
+}
+
+impl<'a> TryFrom<&'a str> for SerializableUrl {
+    type Error = sqlx::Error;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Ok(Self(PgConnectOptions::from_str(value)?))
+    }
+}
+
+impl TryFrom<String> for SerializableUrl {
+    type Error = sqlx::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Ok(Self(PgConnectOptions::from_str(&value)?))
+    }
+}
 
 impl<'de> serde::de::Deserialize<'de> for SerializableUrl {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

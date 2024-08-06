@@ -50,7 +50,7 @@ impl PageQueyer for PullAllPendingTasks {
         write!(f, "SELECT * FROM tasks ")?;
         write!(f, "WHERE status = $1 AND attempts < $2 ")?;
         write!(f, "AND deadline <= $3 AND updated_at = $3 ")?;
-        write!(f, "AND get_worker_id_from_task(task_number, $5) = $6")?;
+        write!(f, "AND get_worker_id_from_task(task_number, $5) = $6 ")?;
         write!(
             f,
             "ORDER BY deadline, get_task_priority_level(priority) DESC "

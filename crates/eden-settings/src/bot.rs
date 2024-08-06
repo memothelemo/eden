@@ -7,15 +7,17 @@ use std::num::NonZeroU64;
 use std::time::Duration;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
+use typed_builder::TypedBuilder;
 
-#[derive(Debug, Deserialize, Document, Serialize)]
+#[derive(Debug, Deserialize, Document, Serialize, TypedBuilder)]
 pub struct Bot {
     /// Parameters for configuring what Eden should behave when
     /// it interacts with Discord's REST/HTTP API.
     ///
     /// **Do not modify if you don't know anything about HTTP or how Discord HTTP API works.**
+    #[builder(default)]
     #[serde(default)]
-    http: Http,
+    pub http: Http,
 
     /// "Local guild/server" is where most of Eden's functionality so forth take place
     /// such as payment processes, administration, form applications and many more
@@ -30,7 +32,7 @@ pub struct Bot {
     /// This field is not optional as Eden needs a central guild/server to take
     /// advantage of full capabilties of Eden.
     #[serde(alias = "local_server")]
-    local_guild: LocalGuild,
+    pub local_guild: LocalGuild,
 
     /// Parameters for sharding.
     ///
@@ -45,9 +47,10 @@ pub struct Bot {
     ///
     /// The default configuration of sharding will be a single shard configuration
     /// with an ID of 0 and size of 1 which is sufficient for small bots.
+    #[builder(default)]
     #[doku(example = "")]
     #[serde(default)]
-    sharding: Sharding,
+    pub sharding: Sharding,
 
     /// This token used to connect and interact with the Discord API.
     ///
@@ -57,33 +60,12 @@ pub struct Bot {
     /// bot is trying to interact with Discord. Exposing your Discord bot
     /// token to the public can get access to your bot possibly ruin
     /// anyone's server/guild!
+    #[builder(setter(into))]
     #[doku(as = "String", example = "<insert token here>")]
-    token: ProtectedString,
+    pub token: ProtectedString,
 }
 
-impl Bot {
-    #[must_use]
-    pub fn http(&self) -> &Http {
-        &self.http
-    }
-
-    #[must_use]
-    pub fn local_guild(&self) -> &LocalGuild {
-        &self.local_guild
-    }
-
-    #[must_use]
-    pub fn sharding(&self) -> &Sharding {
-        &self.sharding
-    }
-
-    #[must_use]
-    pub fn token(&self) -> &ProtectedString {
-        &self.token
-    }
-}
-
-#[derive(Debug, Deserialize, Document, Serialize)]
+#[derive(Debug, Deserialize, Document, Serialize, TypedBuilder)]
 pub struct LocalGuild {
     /// Eden's central/local guild/server's ID.
     ///
@@ -91,14 +73,7 @@ pub struct LocalGuild {
     /// Mode on Discord then right click the guild/server and click/tap the `Copy Server ID`.
     /// Replace `<insert me>` text with the ID you copied.
     #[doku(as = "String", example = "<insert me>")]
-    id: Id<GuildMarker>,
-}
-
-impl LocalGuild {
-    #[must_use]
-    pub fn id(&self) -> Id<GuildMarker> {
-        self.id
-    }
+    pub id: Id<GuildMarker>,
 }
 
 // TODO: allow Eden to do some shard queueing
@@ -141,21 +116,21 @@ impl Default for Sharding {
 pub struct Http {
     /// Proxy server to use for all HTTP(S) requests.
     #[doku(as = "String", example = "localhost:1234")]
-    pub(crate) proxy: Option<Sensitive<String>>,
+    pub proxy: Option<Sensitive<String>>,
 
     /// Whether Eden should use HTTP instead of HTTPS to connect
     /// through the proxy server.
     ///
     /// The default value is true if not set.
     #[doku(as = "bool", example = "true")]
-    pub(crate) proxy_use_http: bool,
+    pub proxy_use_http: bool,
 
     /// Timeout for every HTTP requests
     ///
     /// The default value is 10 seconds if not set.
     #[doku(as = "String", example = "30m")]
     #[serde_as(as = "eden_utils::serial::AsHumanDuration")]
-    pub(crate) timeout: Duration,
+    pub timeout: Duration,
 
     /// Using cache allows Eden to minimize amount of REST/HTTP API requests,
     /// requesting too much will lead to ratelimits.
@@ -169,29 +144,7 @@ pub struct Http {
     ///
     /// The default value is false if not set.
     #[doku(example = "false")]
-    pub(crate) use_cache: bool,
-}
-
-impl Http {
-    #[must_use]
-    pub fn use_cache(&self) -> bool {
-        self.use_cache
-    }
-
-    #[must_use]
-    pub fn proxy(&self) -> Option<&str> {
-        self.proxy.as_deref()
-    }
-
-    #[must_use]
-    pub fn proxy_use_http(&self) -> bool {
-        self.proxy_use_http
-    }
-
-    #[must_use]
-    pub fn timeout(&self) -> Duration {
-        self.timeout
-    }
+    pub use_cache: bool,
 }
 
 impl Default for Http {

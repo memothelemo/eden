@@ -57,6 +57,12 @@ impl IntoAnonymizedError for sqlx::Error {
                 let code = inner.code().map(|v| v.to_string());
                 let message = inner.message().to_string();
 
+                // special Postgres error codes can mean something also
+                match code.as_deref() {
+                    Some("57014") => error_type = DatabaseErrorType::StatementTimedOut,
+                    _ => {}
+                };
+
                 // attaching PostgresErrorInfo
                 report = report.attach(self::tags::PostgresErrorInfo { code, message });
             }
@@ -85,6 +91,28 @@ mod tests {
             .execute(conn)
             .await
             .anonymize_error_into()?;
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn should_classify_as_statement_timed_out(pool: sqlx::PgPool) -> Result<()> {
+        let mut conn = pool.acquire().await.into_typed_error()?;
+        sqlx::query(r#"set statement_timeout = '1000'"#)
+            .execute(&mut *conn)
+            .await
+            .into_typed_error()?;
+
+        let result = sqlx::query("select pg_sleep(3)")
+            .execute(&mut *conn)
+            .await
+            .anonymize_error_into();
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.db_error_type(),
+            Some(&DatabaseErrorType::StatementTimedOut)
+        );
 
         Ok(())
     }

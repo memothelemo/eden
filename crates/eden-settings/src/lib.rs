@@ -10,6 +10,7 @@ use eden_utils::error::tags::Suggestion;
 use eden_utils::Result as EdenResult;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use typed_builder::TypedBuilder;
 
 mod bot;
 mod database;
@@ -23,15 +24,20 @@ pub use self::logging::*;
 pub use self::error::SettingsLoadError;
 pub use eden_tasks::Settings as Worker;
 
-#[derive(Debug, Document, Deserialize)]
+#[derive(Debug, Document, Deserialize, TypedBuilder)]
 pub struct Settings {
-    bot: Bot,
-    database: Database,
+    pub bot: Bot,
+    pub database: Database,
 
+    #[builder(default)]
     #[serde(default)]
-    logging: Logging,
+    pub logging: Logging,
+
+    #[builder(default)]
     #[serde(default)]
-    worker: Worker,
+    pub worker: Worker,
+
+    #[builder(setter(skip), default = None)]
     #[serde(skip)]
     #[doku(skip)]
     path: Option<PathBuf>,
@@ -49,9 +55,10 @@ pub struct Settings {
     /// The default if not set is the total actual amount of your CPU cores
     /// divided by 2 (spare for the operating system). If the CPU however, is a single
     /// core, it will utilize one core only.
+    #[builder(default = Settings::default_workers())]
     #[doku(example = "2")]
     #[serde(default = "Settings::default_workers")]
-    threads: usize,
+    pub threads: usize,
 }
 
 impl Settings {
@@ -85,7 +92,7 @@ impl Settings {
                     .into_typed_error()
                     .change_context(SettingsLoadError)
             })
-            .attach_printable_lazy(|| format!("loaded settings file from: {resolved_path:?}"))?;
+            .attach_printable_lazy(|| format!("using settings file: {resolved_path:?}"))?;
 
         settings.path = resolved_path;
         Ok(settings)
@@ -107,14 +114,42 @@ impl Settings {
             .attach(Suggestion::new("`EDEN_SETTINGS` must be a valid path"))?;
 
         // Try to load from alternative paths
-        for path in Self::ALTERNATIVE_FILE_PATHS {
-            let file_exists = std::fs::metadata(path)
-                .map(|v| v.is_file())
-                .unwrap_or(false);
+        for base_path in Self::ALTERNATIVE_FILE_PATHS {
+            // No need to iterate all alternative file paths if `resolved_path`
+            // is defined from either the `EDEN_SETTINGS` variable or loop itself.
+            let is_resolved_exists = resolved_path
+                .as_ref()
+                .map(|v| v.exists())
+                .unwrap_or_default();
 
-            if file_exists {
-                resolved_path = Some(resolved_path.unwrap_or_else(|| PathBuf::from(path)));
+            if is_resolved_exists {
                 break;
+            }
+
+            // Try resolving settings path by loading from the current directory's
+            // descendants if one of the alternative file path is not locating to
+            // the exact location
+            let base_path = PathBuf::from(base_path);
+            if base_path.is_relative() && !base_path.exists() {
+                let mut parent = std::env::current_dir().ok();
+                'descendant_search: while let Some(descendant) = parent.take() {
+                    let absolute = descendant.join(&base_path);
+                    if absolute.exists() {
+                        resolved_path = Some(absolute);
+                        break 'descendant_search;
+                    }
+
+                    parent = descendant.parent().map(|v| v.to_path_buf());
+                }
+            } else if base_path.is_absolute() {
+                let file_exists = std::fs::metadata(&base_path)
+                    .map(|v| v.is_file())
+                    .unwrap_or(false);
+
+                if file_exists {
+                    resolved_path = Some(resolved_path.unwrap_or_else(|| PathBuf::from(base_path)));
+                    break;
+                }
             }
         }
 
@@ -142,31 +177,6 @@ impl Settings {
 }
 
 impl Settings {
-    #[must_use]
-    pub fn bot(&self) -> &Bot {
-        &self.bot
-    }
-
-    #[must_use]
-    pub fn database(&self) -> &Database {
-        &self.database
-    }
-
-    #[must_use]
-    pub fn logging(&self) -> &Logging {
-        &self.logging
-    }
-
-    #[must_use]
-    pub fn worker(&self) -> &Worker {
-        &self.worker
-    }
-
-    #[must_use]
-    pub fn threads(&self) -> usize {
-        self.threads
-    }
-
     /// Current working path for the [`Settings`] file.
     #[must_use]
     pub fn path(&self) -> Option<&Path> {

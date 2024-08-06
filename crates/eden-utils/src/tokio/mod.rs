@@ -6,10 +6,10 @@ use tokio::task::JoinHandle;
 ///
 /// This is useful for monitoring tokio tasks with `tokio-console`.
 #[allow(unexpected_cfgs)]
-pub fn spawn<F, T>(_name: &str, future: F) -> JoinHandle<T>
+pub fn spawn<F>(_name: &str, future: F) -> JoinHandle<F::Output>
 where
-    T: Send + 'static,
-    F: Future<Output = T> + Send + 'static,
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
 {
     #[cfg(tokio_unstable)]
     let handle = tokio::task::Builder::new()

@@ -9,6 +9,8 @@ pub enum DatabaseErrorType {
     /// No rows returned from a query that is expected to return
     /// at least one row.
     RowNotFound,
+    /// A query statement is timed out.
+    StatementTimedOut,
     /// It is caused by a column that is expected to be unique, the
     /// value exists in within the database table or other table
     /// (if validated by a query trigger).
@@ -20,7 +22,7 @@ pub enum DatabaseErrorType {
 impl DatabaseErrorType {
     pub(crate) fn install_hook() {
         crate::Error::install_hook::<Self>(|_this, _ctx| {
-            // do practically nothing...
+            // practically nothing...
         });
     }
 }

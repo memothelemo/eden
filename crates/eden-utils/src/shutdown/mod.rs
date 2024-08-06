@@ -39,7 +39,7 @@ pub async fn catch_signals() {
         return;
     }
 
-    tokio::spawn(async {
+    crate::tokio::spawn("eden_utils::shutdown::watch_abort", async {
         signals::abort().await;
 
         warn!("received abort signal. aborting process...");

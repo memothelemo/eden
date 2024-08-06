@@ -116,13 +116,16 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
         debug!("clearing temporary tasks");
 
         let mut total = 0;
-        let temporary_tasks = self.0.registry.items().filter(|t| t.is_temporary);
+        let registry = &self.0.registry;
+        let temporary_tasks = registry.items().filter(|t| t.is_temporary);
+
         for entry in temporary_tasks {
             debug!("clearing {:?} tasks", entry.kind);
 
             let tag = tags::ClearAllWithStatusTag::task(entry.kind, entry.rust_name);
 
             let mut conn = self
+                .clone()
                 .db_transaction()
                 .await
                 .change_context(ClearTemporaryTasksError)
@@ -157,6 +160,17 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
             trace!("requeud {amount} stalled task(s)");
         }
         Ok(())
+    }
+
+    #[tracing::instrument(skip_all, level = "debug")]
+    pub(crate) async fn setup(&self) -> Result<(), WorkerStartError> {
+        self.clear_temporary_tasks()
+            .await
+            .change_context(WorkerStartError)?;
+
+        self.update_recurring_tasks_blacklist()
+            .await
+            .change_context(WorkerStartError)
     }
 
     pub(crate) async fn update_recurring_tasks_blacklist(
@@ -303,7 +317,7 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
     /// and how it should be used.
     pub(crate) async fn db_transaction(
         &self,
-    ) -> Result<Transaction<'_, sqlx::Postgres>, QueryError> {
+    ) -> Result<Transaction<'static, sqlx::Postgres>, QueryError> {
         let pool = &self.0.pool;
         pool.begin()
             .await

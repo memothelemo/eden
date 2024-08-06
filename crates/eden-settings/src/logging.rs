@@ -1,7 +1,8 @@
 use doku::Document;
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
-#[derive(Debug, Document, Deserialize, Serialize)]
+#[derive(Debug, Document, Deserialize, Serialize, TypedBuilder)]
 #[serde(default)]
 pub struct Logging {
     /// Logging style to display logs in a certain style.
@@ -12,8 +13,9 @@ pub struct Logging {
     /// - `json` - serializes logs into JSON data
     ///
     /// The default value is `compact`, if not set.
+    #[builder(default = LoggingStyle::Compact)]
     #[doku(as = "String", example = "compact")]
-    pub(crate) style: LoggingStyle,
+    pub style: LoggingStyle,
 
     /// This property filters spans and events based on the
     /// set of directives.
@@ -28,20 +30,9 @@ pub struct Logging {
     ///
     /// The default value will filter only events and spans that
     /// have `info` level.
+    #[builder(default = "info".into())]
     #[doku(example = "info")]
-    pub(crate) targets: String,
-}
-
-impl Logging {
-    #[must_use]
-    pub fn style(&self) -> LoggingStyle {
-        self.style
-    }
-
-    #[must_use]
-    pub fn targets(&self) -> &str {
-        &self.targets
-    }
+    pub targets: String,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]

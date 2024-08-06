@@ -1,6 +1,7 @@
 use chrono::TimeDelta;
 use eden_tasks_schema::types::WorkerId;
 use std::fmt::Debug;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
@@ -10,7 +11,7 @@ use crate::registry::TaskRegistry;
 
 pub struct QueueWorkerInner<S> {
     pub id: WorkerId,
-    pub registry: TaskRegistry<S>,
+    pub registry: Arc<TaskRegistry<S>>,
 
     // state
     pub pool: sqlx::PgPool,

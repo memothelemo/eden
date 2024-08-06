@@ -7,6 +7,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+eden-bot.workspace = true
 eden-settings.workspace = true
 eden-tasks.workspace = true
 eden-utils.workspace = true

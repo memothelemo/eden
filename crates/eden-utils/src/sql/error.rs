@@ -39,6 +39,13 @@ pub trait SqlErrorExt {
         matches!(self.db_error_type(), Some(DatabaseErrorType::RowNotFound))
     }
 
+    fn is_statement_timed_out(&self) -> bool {
+        matches!(
+            self.db_error_type(),
+            Some(DatabaseErrorType::StatementTimedOut)
+        )
+    }
+
     fn is_unique_violation(&self) -> bool {
         matches!(
             self.db_error_type(),

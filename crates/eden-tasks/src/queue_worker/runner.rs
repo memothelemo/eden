@@ -1,7 +1,8 @@
 use chrono::{DateTime, Utc};
 use eden_tasks_schema::types::Task;
+use eden_utils::sql::SqlErrorExt;
 use eden_utils::Result;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, trace, warn, Instrument};
@@ -11,18 +12,20 @@ use super::QueueWorker;
 
 #[derive(Clone)]
 pub struct QueueWorkerRunner<S> {
-    errors: usize,
+    errors: Arc<AtomicUsize>,
     pull_queue_block: Arc<AtomicBool>,
+    should_setup_worker: Arc<AtomicBool>,
     task_manager: QueueWorkerTaskManager,
     worker: QueueWorker<S>,
 }
 
 impl<S: Clone + Send + Sync + 'static> QueueWorkerRunner<S> {
     #[must_use]
-    pub fn new(worker: QueueWorker<S>) -> Self {
+    pub fn new(worker: QueueWorker<S>, setup_later: bool) -> Self {
         Self {
-            errors: 0,
+            errors: Arc::new(AtomicUsize::new(0)),
             pull_queue_block: Arc::new(AtomicBool::new(true)),
+            should_setup_worker: Arc::new(AtomicBool::new(setup_later)),
             task_manager: worker.0.task_manager.clone(),
             worker,
         }
@@ -43,12 +46,21 @@ impl<S: Clone + Send + Sync + 'static> QueueWorkerRunner<S> {
 
             let now = Utc::now();
             let instant = Instant::now();
-            match self.next_action(now).await {
+
+            let action = self.next_action(now).await;
+            trace!("received action: {action:?}");
+            match action {
                 RunnerAction::Continue => {
+                    if sleep_duration != DEFAULT_INTERVAL {
+                        info!(
+                            "queue worker {} went back to healthy status",
+                            self.worker.id()
+                        );
+                    }
                     sleep_duration = DEFAULT_INTERVAL;
                 }
                 RunnerAction::TimedOut => {
-                    warn!("worker runner timed out for {TIMED_OUT_INTERVAL:?}");
+                    warn!("queue worker {} timed out for {TIMED_OUT_INTERVAL:?} because of these consecutive errors", self.worker.id());
                     sleep_duration = TIMED_OUT_INTERVAL;
                 }
                 RunnerAction::Close => {
@@ -64,7 +76,7 @@ impl<S: Clone + Send + Sync + 'static> QueueWorkerRunner<S> {
             let closed = Box::pin(self.task_manager.closed());
             tokio::select! {
                 _ = closed => {
-                    debug!("closing queue worker runner {}", self.worker.id());
+                    info!("closing queue worker {}", self.worker.id());
                     break;
                 }
                 _ = sleep => {}
@@ -72,17 +84,47 @@ impl<S: Clone + Send + Sync + 'static> QueueWorkerRunner<S> {
         }
     }
 
-    async fn next_action(&mut self, now: DateTime<Utc>) -> RunnerAction {
+    async fn next_action(&self, now: DateTime<Utc>) -> RunnerAction {
+        // Setup worker if the database is healthy after some time
+        let should_setup_worker = self.should_setup_worker.load(Ordering::Relaxed);
+        if should_setup_worker {
+            debug!("attempting to set up worker");
+
+            // Then, try to set up as usual...
+            let result = self.worker.setup().await;
+            if result.is_pool_error() {
+                debug!("database is unhealthy, skipping loop");
+
+                let errors = self.errors.load(Ordering::Relaxed);
+                self.errors
+                    .store(errors.checked_add(1).unwrap_or_default(), Ordering::Relaxed);
+
+                return RunnerAction::Continue;
+            }
+
+            if let Err(error) = result {
+                warn!(error = %error.anonymize(), "got an error while setting up worker");
+            }
+
+            let errors = self.errors.load(Ordering::Relaxed);
+            if errors > 0 {
+                info!(
+                    "database is healthy. ready to pull pending tasks for worker {}",
+                    self.worker.id()
+                );
+            }
+            self.errors.store(0, Ordering::Relaxed);
+            self.should_setup_worker.store(false, Ordering::Relaxed);
+        }
+
         tokio::select! {
             result = self.run_pending_tasks(now) => match result {
                 Ok(..) => {}
                 Err(error) => {
                     warn!(%error, "failed to run all pending tasks");
-                    self.errors = self
-                        .errors
-                        .clamp(self.errors + 1, MAX_ERRORS_UNTIL_TIMED_OUT);
 
-                    if self.errors > MAX_ERRORS_UNTIL_TIMED_OUT {
+                    let errors = self.errors.fetch_add(1, Ordering::Relaxed);
+                    if errors >= MAX_ERRORS_UNTIL_TIMED_OUT {
                         return RunnerAction::TimedOut;
                     }
                 }
@@ -190,7 +232,7 @@ impl<S: Clone + Send + Sync + 'static> QueueWorkerRunner<S> {
                 trace!("pending_tasks.len() = {}", pending_tasks.len());
             }
 
-            trace!("pulled {pulled_queued_tasks} queued task(s)");
+            trace!("pulled batch of {pulled_queued_tasks} queued task(s)");
         } else {
             trace!("pulling queued tasks timed out");
         }
@@ -210,10 +252,26 @@ impl<S: Clone + Send + Sync + 'static> QueueWorkerRunner<S> {
 const TIMED_OUT_INTERVAL: Duration = Duration::from_secs(30);
 const DEFAULT_INTERVAL: Duration = Duration::from_millis(100);
 
-const MAX_ERRORS_UNTIL_TIMED_OUT: usize = 3;
+const MAX_ERRORS_UNTIL_TIMED_OUT: usize = 2;
 
+#[derive(Debug)]
 enum RunnerAction {
     Continue,
     TimedOut,
     Close,
+}
+
+#[allow(unused)]
+#[cfg(test)]
+mod tests {
+    use super::QueueWorkerRunner;
+    use static_assertions::assert_impl_one;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct State;
+
+    fn test_generics<T: Sync + Send>() {}
+    fn test() {
+        test_generics::<QueueWorkerRunner<State>>();
+    }
 }

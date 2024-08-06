@@ -37,7 +37,7 @@ Y88888P Y8888D' Y88888P VP   V8P
     } else {
         eprintln!("{}:\t<none>", header.paint("Settings file"));
     }
-    eprintln!("{}:\t{}", header.paint("Threads"), settings.threads());
+    eprintln!("{}:\t{}", header.paint("Threads"), settings.threads);
 
     eprintln!();
 }

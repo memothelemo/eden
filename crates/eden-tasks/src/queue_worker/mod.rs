@@ -1,6 +1,7 @@
 use eden_tasks_schema::types::TaskRawData;
 use eden_utils::error::exts::{IntoTypedError, ResultExt};
 use eden_utils::error::tags::Suggestion;
+use eden_utils::sql::SqlErrorExt;
 use eden_utils::time::IntoStdDuration;
 use eden_utils::{Error, ErrorCategory, Result};
 use serde::de::DeserializeOwned;
@@ -43,7 +44,7 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
     pub fn new(id: WorkerId, pool: sqlx::PgPool, settings: &Settings, state: S) -> Self {
         Self(Arc::new(QueueWorkerInner {
             id,
-            registry: TaskRegistry::new(),
+            registry: Arc::new(TaskRegistry::new()),
 
             pool,
             runner_handle: Mutex::new(None),
@@ -75,6 +76,13 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
     #[must_use]
     pub fn running_tasks(&self) -> usize {
         self.0.task_manager.running_tasks()
+    }
+
+    // strictly for testing only!
+    #[doc(hidden)]
+    #[must_use]
+    pub fn get_state(&self) -> &S {
+        &self.0.state
     }
 }
 
@@ -136,25 +144,31 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
     /// different thread until a shutdown signal is triggered.
     #[tracing::instrument(skip_all, level = "debug", fields(worker.id = %self.0.id))]
     pub async fn start(&self) -> Result<(), WorkerStartError> {
-        debug!(
-            concurrency = %self.0.max_running_tasks,
-            "starting worker {}",
-            self.0.id
-        );
-
         let mut handle = self.0.runner_handle.lock().await;
         if handle.is_some() {
             return Err(Error::context(ErrorCategory::Unknown, WorkerStartError))
                 .attach_printable("already started worker process");
         }
 
-        self.clear_temporary_tasks()
-            .await
-            .change_context(WorkerStartError)?;
+        // The database maybe offline for a while so we need to setup later on. :)
+        let result = self.setup().await;
 
-        self.update_recurring_tasks_blacklist()
-            .await
-            .change_context(WorkerStartError)?;
+        let mut setup_later = result.is_err() && result.is_pool_error();
+        if setup_later {
+            warn!(
+                concurrency = %self.0.max_running_tasks,
+                "starting worker {} with an unhealthy database",
+                self.0.id
+            );
+            setup_later = true;
+        } else if result.is_err() {
+            result?;
+            debug!(
+                concurrency = %self.0.max_running_tasks,
+                "starting worker {}",
+                self.0.id
+            );
+        }
 
         let registry = &self.0.registry;
         registry.update_recurring_tasks_deadline(None).await;
@@ -162,7 +176,7 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
         let worker_tx = self.clone();
         *handle = Some(eden_utils::tokio::spawn(
             "eden_tasks::worker::runner::run",
-            self::runner::QueueWorkerRunner::new(worker_tx).run(),
+            self::runner::QueueWorkerRunner::new(worker_tx, setup_later).run(),
         ));
 
         Ok(())
@@ -182,7 +196,7 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
         }
 
         // Real shutdown happens
-        info!("shutting down worker {}", self.id());
+        info!("shutting down queue worker {}", self.id());
         task_manager.close();
 
         // We want to wait for tasks to be finished

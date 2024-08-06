@@ -103,10 +103,8 @@ impl<'a> PageQueyer for GetAllTasks<'a> {
         let total_workers_count = count;
         write!(
             f,
-            r#"get_worker_id_from_task(task_number, ${total_workers_count}) = ${worker_id_count}"#
+            r#"get_worker_id_from_task(task_number, ${total_workers_count}) = ${worker_id_count} "#
         )?;
-        write!(f, "")?;
-
         f.write_str("FOR UPDATE SKIP LOCKED")
     }
 }

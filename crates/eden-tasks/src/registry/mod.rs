@@ -16,7 +16,7 @@ pub use self::recurring::RecurringTask;
 
 /// Responsible for keeping all registered metadata of tasks
 pub struct TaskRegistry<S> {
-    items: DashMap<&'static str, RegistryItem<S>>,
+    items: Arc<DashMap<String, RegistryItem<S>>>,
     // We want to keep it read-only so that we don't have to use
     // Mutex to access a list of registered recurring tasks.
     recurring_tasks: RwLock<Vec<Arc<RecurringTask>>>,
@@ -25,7 +25,7 @@ pub struct TaskRegistry<S> {
 impl<S: Clone + Send + Sync + 'static> TaskRegistry<S> {
     pub fn new() -> Self {
         Self {
-            items: DashMap::new(),
+            items: Arc::new(DashMap::new()),
             recurring_tasks: RwLock::new(Vec::new()),
         }
     }
@@ -56,7 +56,7 @@ impl<S: Clone + Send + Sync + 'static> TaskRegistry<S> {
             priority: T::priority(),
             rust_name: type_name,
         };
-        self.items.insert(kind, item);
+        self.items.insert(kind.to_string(), item);
 
         if is_recurring {
             let task = RecurringTask::new::<S, T>();
@@ -65,12 +65,12 @@ impl<S: Clone + Send + Sync + 'static> TaskRegistry<S> {
     }
 
     #[must_use]
-    pub fn find_item(&self, kind: &str) -> Option<Ref<'_, &'static str, RegistryItem<S>>> {
-        self.items.get(kind)
+    pub fn find_item(&self, kind: &str) -> Option<Ref<'_, String, RegistryItem<S>>> {
+        self.items.get(&kind.to_string())
     }
 
     #[must_use]
-    pub fn items(&self) -> dashmap::iter::Iter<'_, &'static str, RegistryItem<S>> {
+    pub fn items(&self) -> dashmap::iter::Iter<'_, String, RegistryItem<S>> {
         self.items.iter()
     }
 

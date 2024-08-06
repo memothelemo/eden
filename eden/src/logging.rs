@@ -17,23 +17,23 @@ pub fn init(settings: &Settings) -> Result<()> {
 
     let env_filter = tracing_subscriber::EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
-        .parse(settings.logging().targets())
+        .parse(&settings.logging.targets)
         .into_typed_error()
         .attach_printable("could not parse log targets")
         .attach(Suggestion::new(DIRECTIVES_SUGGESTION))?;
 
-    let log_layer = match settings.logging().style() {
+    let log_layer = match settings.logging.style {
         LoggingStyle::Compact => tracing_subscriber::fmt::layer()
             .compact()
-            .without_time()
+            // .without_time()
             .boxed(),
         LoggingStyle::Pretty => tracing_subscriber::fmt::layer()
             .pretty()
-            .without_time()
+            // .without_time()
             .boxed(),
         LoggingStyle::JSON => tracing_subscriber::fmt::layer()
             .json()
-            .without_time()
+            // .without_time()
             .boxed(),
     }
     .with_filter(env_filter);
