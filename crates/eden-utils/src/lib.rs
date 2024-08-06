@@ -8,6 +8,7 @@ pub mod sql;
 pub mod shutdown;
 pub mod tokio;
 
+pub mod aliases;
 pub mod build;
 pub mod env;
 pub mod error;

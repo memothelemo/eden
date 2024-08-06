@@ -1,5 +1,6 @@
 use chrono::TimeDelta;
 use doku::Document;
+use eden_tasks_schema::types::WorkerId;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -9,6 +10,15 @@ use typed_builder::TypedBuilder;
 #[derive(Debug, Deserialize, Document, Serialize, TypedBuilder)]
 #[serde(default)]
 pub struct Settings {
+    /// Assigned queue worker ID. This field allows for the entire
+    /// workers to equally distribute tasks based on their worker ID
+    /// without any conflicts.
+    ///
+    /// It defaults to `[0, 1]` if not set.
+    #[doku(as = "Vec<u64>", example = "[0, 1]")]
+    #[builder(default = WorkerId::ONE)]
+    pub(crate) id: WorkerId,
+
     /// Maximum amount of tasks both recurring and queued running
     /// at the same time. If one task needs to perform, it has to
     /// wait until a running task before the queue filled up,
@@ -28,7 +38,8 @@ pub struct Settings {
     pub(crate) max_task_retries: u16,
 
     /// Processes a specified number of queued tasks in a batch and waits
-    /// for all them to complete before moving to another batch.
+    /// for all them to complete before proceeding to another batch of
+    /// queued tasks.
     ///
     /// It defaults to `50` if not set.
     #[doku(as = "u64", example = "50")]
@@ -46,6 +57,11 @@ pub struct Settings {
 }
 
 impl Settings {
+    #[must_use]
+    pub fn id(self) -> WorkerId {
+        self.id
+    }
+
     #[must_use]
     pub fn max_running_tasks(&self) -> usize {
         self.max_running_tasks.get()
@@ -66,6 +82,7 @@ impl Default for Settings {
     #[allow(clippy::unwrap_used)]
     fn default() -> Self {
         Self {
+            id: WorkerId::ONE,
             max_running_tasks: NonZeroUsize::new(10).unwrap(),
             max_task_retries: 3,
             queued_tasks_per_batch: NonZeroU64::new(50).unwrap(),

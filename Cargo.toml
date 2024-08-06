@@ -11,6 +11,9 @@ rust-version = "1.79.0"
 
 [workspace.dependencies]
 # eden crates
+eden-discord = { path = "crates/eden-discord" }
+eden-schema = { path = "crates/eden-schema" }
+eden-settings = { path = "crates/eden-settings" }
 eden-tasks = { path = "crates/eden-tasks" }
 eden-utils = { path = "crates/eden-utils" }
 

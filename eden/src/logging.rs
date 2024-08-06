@@ -1,3 +1,4 @@
+use eden_settings::{LoggingStyle, Settings};
 use eden_utils::error::tags::Suggestion;
 use eden_utils::{error::exts::*, Result};
 use tracing::level_filters::LevelFilter;
@@ -6,7 +7,7 @@ use tracing_subscriber::{layer::SubscriberExt, Layer};
 
 const DIRECTIVES_SUGGESTION: &'static str = "Read the syntax guide for filter directives at:\nhttps://docs.rs/tracing-subscriber/0.3.18/tracing_subscriber/filter/struct.EnvFilter.html#directives";
 
-pub fn init() -> Result<()> {
+pub fn init(settings: &Settings) -> Result<()> {
     // I don't know how it happens but it somehow fixed the issue
     // of some events not emitted through the console likely
     // because of inconsistences `log` and `tracing` crates.
@@ -16,16 +17,26 @@ pub fn init() -> Result<()> {
 
     let env_filter = tracing_subscriber::EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
-        .parse(eden_utils::env::var("RUST_LOG")?)
+        .parse(settings.logging().targets())
         .into_typed_error()
         .attach_printable("could not parse log targets")
         .attach(Suggestion::new(DIRECTIVES_SUGGESTION))?;
 
-    let log_layer = tracing_subscriber::fmt::layer()
-        .pretty()
-        .without_time()
-        .boxed()
-        .with_filter(env_filter);
+    let log_layer = match settings.logging().style() {
+        LoggingStyle::Compact => tracing_subscriber::fmt::layer()
+            .compact()
+            .without_time()
+            .boxed(),
+        LoggingStyle::Pretty => tracing_subscriber::fmt::layer()
+            .pretty()
+            .without_time()
+            .boxed(),
+        LoggingStyle::JSON => tracing_subscriber::fmt::layer()
+            .json()
+            .without_time()
+            .boxed(),
+    }
+    .with_filter(env_filter);
 
     let subscriber = tracing_subscriber::Registry::default()
         .with(log_layer)

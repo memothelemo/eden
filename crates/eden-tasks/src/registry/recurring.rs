@@ -100,3 +100,32 @@ impl<'a> Drop for RecurringTaskRunningGuard<'a> {
         self.task.set_running(false);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::SampleRecurringTask;
+
+    #[tokio::test]
+    async fn update_deadline() {
+        let task = RecurringTask::new::<_, SampleRecurringTask>();
+        task.set_blocked(true).await;
+
+        let now = Utc::now();
+        task.update_deadline(now).await;
+        assert_eq!(task.deadline().await, None);
+
+        task.set_blocked(false).await;
+        task.update_deadline(now).await;
+        assert!(task.deadline().await.is_some());
+    }
+
+    #[test]
+    fn running_guard() {
+        let task = RecurringTask::new::<_, SampleRecurringTask>();
+        let guard = task.running_guard();
+        assert_eq!(task.is_running(), true);
+        drop(guard);
+        assert_eq!(task.is_running(), false);
+    }
+}

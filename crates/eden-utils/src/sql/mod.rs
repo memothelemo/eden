@@ -15,6 +15,20 @@ use crate::error::any::report_from_any_error;
 use crate::error::exts::{AnyErrorExt, IntoAnonymizedError, IntoError};
 use crate::error::{Error, ErrorCategory};
 
+#[derive(Debug)]
+pub struct CountResult {
+    pub total: i64,
+}
+
+impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for CountResult {
+    fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+        Ok(Self {
+            total: row.try_get("total")?,
+        })
+    }
+}
+
 impl IntoError for sqlx::Error {
     type Context = QueryError;
 

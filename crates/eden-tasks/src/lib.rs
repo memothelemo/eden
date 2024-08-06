@@ -2,9 +2,10 @@
 
 pub mod backoff;
 pub mod error;
+pub mod queue_worker;
 pub mod task;
-pub mod worker;
 
+pub use self::queue_worker::{QueueWorker, WorkerId};
 pub use self::scheduled::Scheduled;
 pub use self::settings::Settings;
 pub use self::task::{Task, TaskPriority, TaskResult, TaskRunContext, TaskTrigger};
@@ -22,3 +23,4 @@ pub mod prelude {
 mod registry;
 mod scheduled;
 mod settings;
+mod test_utils;

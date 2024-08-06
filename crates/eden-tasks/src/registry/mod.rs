@@ -174,3 +174,19 @@ pub type DeserializerFn<S> = Box<
         + Sync
         + 'static,
 >;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::SampleRecurringTask;
+
+    type TestRegistry = TaskRegistry<()>;
+
+    #[test]
+    #[should_panic]
+    fn should_crash_if_registered_task_twice() {
+        let registry = TestRegistry::new();
+        registry.register_task::<SampleRecurringTask>();
+        registry.register_task::<SampleRecurringTask>();
+    }
+}

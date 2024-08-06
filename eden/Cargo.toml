@@ -7,13 +7,12 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+eden-settings.workspace = true
 eden-tasks.workspace = true
 eden-utils.workspace = true
-sqlx.workspace = true
+
+nu-ansi-term = "0.50.1"
 tokio.workspace = true
-
-rand = "*"
-
 tracing.workspace = true
 tracing-error.workspace = true
 tracing-log = "0.2.0"
