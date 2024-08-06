@@ -45,6 +45,7 @@ pub struct Bot {
     ///
     /// The default configuration of sharding will be a single shard configuration
     /// with an ID of 0 and size of 1 which is sufficient for small bots.
+    #[doku(example = "")]
     #[serde(default)]
     sharding: Sharding,
 

@@ -15,7 +15,7 @@ pub struct Settings {
     /// without any conflicts.
     ///
     /// It defaults to `[0, 1]` if not set.
-    #[doku(as = "Vec<u64>", example = "[0, 1]")]
+    #[doku(as = "Vec<u32>", example = "0, 1")]
     #[builder(default = WorkerId::ONE)]
     pub(crate) id: WorkerId,
 

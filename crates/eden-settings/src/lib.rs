@@ -125,9 +125,18 @@ impl Settings {
     /// documentation using [`doku`].
     #[must_use]
     pub fn generate_docs() -> String {
+        use doku::toml::{EnumsStyle, Spacing};
+
         let fmt = doku::toml::Formatting {
+            spacing: Spacing {
+                lines_between_scalar_field_comments: 1,
+                lines_between_scalar_fields: 0,
+                ..Default::default()
+            },
+            enums_style: EnumsStyle::Commented,
             ..Default::default()
         };
+
         doku::to_toml_fmt::<Self>(&fmt)
     }
 }

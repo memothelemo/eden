@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*", "eden"]
+members = ["crates/*", "eden", "xtask"]
 resolver = "2"
 
 [workspace.package]
@@ -33,6 +33,7 @@ paste = "1.0.15"
 thiserror = "1.0.61"
 
 # user configuration
+clap = { version = "4.5.13", features = ["derive"] }
 config = { version = "0.14.0", features = ["convert-case", "preserve_order", "toml"], default-features = false }
 doku = "0.21.1"
 dotenvy = "0.15.7"
