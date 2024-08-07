@@ -28,10 +28,9 @@ pub struct QueueWorkerInner<S> {
 
 impl<S: Clone + Send + Sync + 'static> Debug for QueueWorkerInner<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Worker")
+        f.debug_struct("QueueWorker")
             .field("id", &self.id)
             .field("registry", &self.registry)
-            .field("pool", &self.pool)
             .field("max_attempts", &self.max_attempts)
             .field("max_running_tasks", &self.max_running_tasks)
             .field("stalled_tasks_threshold", &self.stalled_tasks_threshold)

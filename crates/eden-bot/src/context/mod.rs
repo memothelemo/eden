@@ -1,6 +1,7 @@
 use eden_settings::Settings;
 use eden_tasks::QueueWorker;
 use sqlx::postgres::PgPoolOptions;
+use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::sync::atomic::Ordering;
@@ -84,6 +85,7 @@ impl Bot {
         let worker_id = settings.worker.id;
         let queue = QueueWorker::new(worker_id, pool.clone(), &settings.worker, bot.clone());
         let queue = crate::tasks::register_all_tasks(queue);
+
         unsafe {
             let inner = &mut *(Arc::as_ptr(&inner) as *mut MaybeUninit<BotInner>);
             inner.write(BotInner {
@@ -133,6 +135,18 @@ impl Deref for Bot {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Debug for Bot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bot")
+            .field("application_id", &self.application_id())
+            .field("http", &self.http)
+            .field("pool", &self.pool)
+            .field("queue", &self.queue)
+            .field("settings", &self.settings)
+            .finish()
     }
 }
 

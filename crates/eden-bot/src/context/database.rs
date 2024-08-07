@@ -2,7 +2,7 @@ use eden_utils::{error::exts::*, Result};
 
 use crate::Bot;
 
-// TODO: Add support for hybrid pool system with primary and backup databases
+// TODO: Add support for hybrid pool system with primary and backup database pools
 impl Bot {
     /// Obtain a database connection from the primary pool.
     #[tracing::instrument(skip_all)]

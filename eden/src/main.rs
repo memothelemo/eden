@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 async fn bootstrap(settings: Settings) -> Result<()> {
     let bot = Bot::new(Arc::new(settings));
+    println!("{bot:#?}");
     bot.queue.start().await?;
 
     eden_utils::shutdown::catch_signals().await;
