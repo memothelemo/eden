@@ -752,13 +752,16 @@ dependencies = [
 name = "eden-bot"
 version = "0.1.0-alpha.0"
 dependencies = [
+ "chrono",
  "eden-discord-types",
  "eden-schema",
  "eden-settings",
  "eden-tasks",
  "eden-utils",
+ "futures",
  "sqlx",
  "tokio",
+ "tokio-util",
  "tracing",
  "twilight-cache-inmemory",
  "twilight-gateway",

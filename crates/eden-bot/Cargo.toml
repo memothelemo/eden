@@ -14,8 +14,11 @@ eden-settings.workspace = true
 eden-tasks.workspace = true
 eden-utils.workspace = true
 
+chrono.workspace = true
+futures.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 tracing.workspace = true
 
 # twilight crates

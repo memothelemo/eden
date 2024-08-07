@@ -14,5 +14,6 @@ pub mod env;
 pub mod error;
 pub mod time;
 pub mod types;
+pub mod vec;
 
 pub use self::error::{Error, ErrorCategory, Result};

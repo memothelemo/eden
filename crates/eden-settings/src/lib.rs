@@ -1,4 +1,4 @@
-#![feature(let_chains)]
+#![feature(debug_closure_helpers, let_chains)]
 use config::{Config, ConfigBuilder};
 use doku::Document;
 use eden_utils::build;
@@ -95,6 +95,8 @@ impl Settings {
             .attach_printable_lazy(|| format!("using settings file: {resolved_path:?}"))?;
 
         settings.path = resolved_path;
+        settings.bot.sharding.check()?;
+
         Ok(settings)
     }
 

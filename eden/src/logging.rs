@@ -1,4 +1,5 @@
 use eden_settings::{LoggingStyle, Settings};
+use eden_utils::build;
 use eden_utils::error::tags::Suggestion;
 use eden_utils::{error::exts::*, Result};
 use tracing::level_filters::LevelFilter;
@@ -16,7 +17,11 @@ pub fn init(settings: &Settings) -> Result<()> {
         .attach_printable("could not initialize log tracer")?;
 
     let env_filter = tracing_subscriber::EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
+        .with_default_directive(if build::PROFILE == "release" {
+            LevelFilter::WARN.into()
+        } else {
+            LevelFilter::INFO.into()
+        })
         .parse(&settings.logging.targets)
         .into_typed_error()
         .attach_printable("could not parse log targets")

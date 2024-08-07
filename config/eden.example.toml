@@ -96,7 +96,7 @@ id = "<insert me>"
 #     # Assigned id for a single shard/instance
 #     id = 123
 #     
-#     # Total amount of shards needed/should connect to Discord gateway.
+#     # Total amount of shards needed to be utilized for the bot.
 #     total = 1
 # - 
 #     type = "range"
@@ -106,7 +106,7 @@ id = "<insert me>"
 #     # Maximum ID that needs to be connected per instance.
 #     end = 3
 #     
-#     # Total amount of shards needed/should connect to Discord gateway.
+#     # Total amount of shards needed to be utilized for the bot.
 #     total = 5
 
 [database]
@@ -144,6 +144,13 @@ max_connections = 10
 # 
 # The default is `0` connections, if not set.
 min_connections = 0
+
+# Maximum period of time that every transaction in the database
+# must be performed before it will cancel the transaction if it
+# exceeds the threshold.
+# 
+# The default is `15` seconds, if not set.
+query_timeout = "15s"
 
 # Connection URL to connect to the Postgres database.
 # 

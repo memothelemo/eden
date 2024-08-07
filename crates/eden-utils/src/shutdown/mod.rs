@@ -48,9 +48,9 @@ pub async fn catch_signals() {
     });
 }
 
-/// Attempts to perform graceful shutdown the entire process without
-/// the user or the host trigger the shutdown signal.
-pub async fn shutdown(mode: ShutdownMode) {
+/// Attempts to perform graceful/abort shutdown the entire process without
+/// letting the user or the host trigger the shutdown signal.
+pub async fn trigger(mode: ShutdownMode) {
     match mode {
         ShutdownMode::Graceful => {
             warn!("requested shutdown. performing graceful shutdown...");

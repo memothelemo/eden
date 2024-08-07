@@ -1,5 +1,7 @@
 use doku::Document;
+use eden_utils::error::exts::ErrorExt;
 use eden_utils::types::{ProtectedString, Sensitive};
+use eden_utils::{Error, ErrorCategory, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt::Debug;
@@ -8,6 +10,8 @@ use std::time::Duration;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
 use typed_builder::TypedBuilder;
+
+use crate::SettingsLoadError;
 
 #[derive(Debug, Deserialize, Document, Serialize, TypedBuilder)]
 pub struct Bot {
@@ -77,13 +81,14 @@ pub struct LocalGuild {
 }
 
 // TODO: allow Eden to do some shard queueing
-#[derive(Debug, Deserialize, Document, Serialize)]
+#[derive(Deserialize, Document, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Sharding {
     Single {
         /// Assigned id for a single shard/instance
+        #[doku(as = "u64", example = "0")]
         id: u64,
-        /// Total amount of shards needed/should connect to Discord gateway.
+        /// Total amount of shards needed to be utilized for the bot.
         #[doku(as = "u64", example = "1")]
         total: NonZeroU64,
     },
@@ -93,12 +98,106 @@ pub enum Sharding {
 
         /// Maximum ID that needs to be connected per instance.
         #[doku(as = "u64", example = "3")]
-        end: NonZeroU64,
+        end: u64,
 
-        /// Total amount of shards needed/should connect to Discord gateway.
+        /// Total amount of shards needed to be utilized for the bot.
         #[doku(as = "u64", example = "5")]
         total: NonZeroU64,
     },
+}
+
+impl Sharding {
+    pub const ONE: Self = Sharding::Single {
+        id: 0,
+        // SAFETY: 1 > 0
+        total: unsafe { NonZeroU64::new_unchecked(1) },
+    };
+
+    /// First shard index to initialize.
+    #[must_use]
+    pub fn first(&self) -> u64 {
+        match self {
+            Self::Single { id, .. } => *id,
+            Self::Range { start, .. } => *start,
+        }
+    }
+
+    /// Number of shards to initialize.
+    #[must_use]
+    pub fn size(&self) -> u64 {
+        match self {
+            Self::Single { .. } => 1,
+            Self::Range { start, end, .. } => end - start + 1,
+        }
+    }
+
+    /// Total shards needed to be utilized for the bot.
+    #[must_use]
+    pub fn total(&self) -> u64 {
+        match self {
+            Self::Single { total, .. } => total.get(),
+            Self::Range { total, .. } => total.get(),
+        }
+    }
+}
+
+impl Sharding {
+    // Check the entire configuration if it is configured as intended.
+    pub fn check(&self) -> Result<(), SettingsLoadError> {
+        match self {
+            Self::Single { id, total } => {
+                if *id >= total.get() {
+                    return Err(Error::context(ErrorCategory::Unknown, SettingsLoadError)
+                        .attach_printable(
+                            "`sharding.id` should not be equal or greater than the total",
+                        ));
+                }
+            }
+            Self::Range { start, end, total } => {
+                // start = end is okay but single is recommended
+                let start = *start;
+                let end = *end;
+                let total = total.get();
+
+                if start > end {
+                    return Err(Error::context(ErrorCategory::Unknown, SettingsLoadError)
+                        .attach_printable(
+                            "`sharding.start` should not be more than `sharding.end`",
+                        ));
+                }
+
+                // start or end must not exceed with the total field
+                if start >= total {
+                    return Err(Error::context(ErrorCategory::Unknown, SettingsLoadError)
+                        .attach_printable(
+                            "`sharding.start` should not be equal or more than `sharding.total`",
+                        ));
+                }
+
+                if end >= total {
+                    return Err(Error::context(ErrorCategory::Unknown, SettingsLoadError)
+                        .attach_printable(
+                            "`sharding.end` should not be equal or more than `sharding.total`",
+                        ));
+                }
+            }
+        };
+        Ok(())
+    }
+}
+
+impl Debug for Sharding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Range { start, end, total } => f
+                .debug_struct("Range")
+                .field("start", start)
+                .field("end", end)
+                .field("total", &total.get())
+                .finish(),
+            Self::Single { id, total } => write!(f, "Single([{id}, {}])", total.get()),
+        }
+    }
 }
 
 impl Default for Sharding {
@@ -155,5 +254,181 @@ impl Default for Http {
             proxy_use_http: true,
             timeout: Duration::from_secs(10),
         }
+    }
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shard_check() {
+        let case = Sharding::ONE;
+        assert!(case.check().is_ok());
+
+        let case = Sharding::Single {
+            id: 0,
+            total: NonZeroU64::new(5).unwrap(),
+        };
+        assert!(case.check().is_ok());
+
+        let case = Sharding::Single {
+            id: 1,
+            total: NonZeroU64::new(1).unwrap(),
+        };
+        assert!(case.check().is_err());
+
+        let case = Sharding::Single {
+            id: 2,
+            total: NonZeroU64::new(1).unwrap(),
+        };
+        assert!(case.check().is_err());
+
+        ///////////////////////////////////////////////////
+        let case = Sharding::Range {
+            start: 0,
+            end: 1,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert!(case.check().is_ok());
+
+        let case = Sharding::Range {
+            start: 1,
+            end: 1,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert!(case.check().is_ok());
+
+        let case = Sharding::Range {
+            start: 0,
+            end: 0,
+            total: NonZeroU64::new(1).unwrap(),
+        };
+        assert!(case.check().is_ok());
+
+        let case = Sharding::Range {
+            start: 0,
+            end: 2,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert!(case.check().is_err());
+
+        let case = Sharding::Range {
+            start: 2,
+            end: 2,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert!(case.check().is_err());
+
+        let case = Sharding::Range {
+            start: 2,
+            end: 0,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert!(case.check().is_err());
+
+        let case = Sharding::Range {
+            start: 2,
+            end: 1,
+            total: NonZeroU64::new(3).unwrap(),
+        };
+        assert!(case.check().is_err());
+    }
+
+    #[test]
+    fn shard_test_first() {
+        let default = Sharding::ONE;
+        assert_eq!(default.first(), 0);
+
+        let one = Sharding::Single {
+            id: 0,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert_eq!(one.first(), 0);
+
+        let one = Sharding::Single {
+            id: 1,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert_eq!(one.first(), 1);
+
+        let multiple = Sharding::Range {
+            start: 0,
+            end: 0,
+            total: NonZeroU64::new(1).unwrap(),
+        };
+        assert_eq!(multiple.first(), 0);
+
+        let multiple = Sharding::Range {
+            start: 1,
+            end: 3,
+            total: NonZeroU64::new(4).unwrap(),
+        };
+        assert_eq!(multiple.first(), 1);
+    }
+
+    #[test]
+    fn shard_test_size() {
+        let default = Sharding::ONE;
+        assert_eq!(default.size(), 1);
+
+        let one = Sharding::Single {
+            id: 0,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert_eq!(one.size(), 1);
+
+        let one = Sharding::Single {
+            id: 1,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert_eq!(one.size(), 1);
+
+        let multiple = Sharding::Range {
+            start: 0,
+            end: 0,
+            total: NonZeroU64::new(1).unwrap(),
+        };
+        assert_eq!(multiple.size(), 1);
+
+        let multiple = Sharding::Range {
+            start: 1,
+            end: 3,
+            total: NonZeroU64::new(4).unwrap(),
+        };
+        assert_eq!(multiple.size(), 3);
+    }
+
+    #[test]
+    fn shard_test_total() {
+        let default = Sharding::ONE;
+        assert_eq!(default.total(), 1);
+
+        let one = Sharding::Single {
+            id: 0,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert_eq!(one.total(), 2);
+
+        let one = Sharding::Single {
+            id: 1,
+            total: NonZeroU64::new(2).unwrap(),
+        };
+        assert_eq!(one.total(), 2);
+
+        let multiple = Sharding::Range {
+            start: 0,
+            end: 0,
+            total: NonZeroU64::new(1).unwrap(),
+        };
+        assert_eq!(multiple.total(), 1);
+
+        let multiple = Sharding::Range {
+            start: 1,
+            end: 3,
+            total: NonZeroU64::new(4).unwrap(),
+        };
+        assert_eq!(multiple.total(), 4);
     }
 }

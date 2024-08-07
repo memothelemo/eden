@@ -1,3 +1,4 @@
+use eden_bot::shard::ShardManager;
 use eden_bot::Bot;
 use eden_settings::Settings;
 use eden_utils::error::exts::*;
@@ -6,11 +7,13 @@ use std::sync::Arc;
 
 async fn bootstrap(settings: Settings) -> Result<()> {
     let bot = Bot::new(Arc::new(settings));
-    println!("{bot:#?}");
-    bot.queue.start().await?;
+    let shard_manager = ShardManager::new(bot.clone());
+    shard_manager.start_all();
+    shard_manager.wait_for_all_connected().await;
 
     eden_utils::shutdown::catch_signals().await;
-    bot.queue.shutdown().await;
+    shard_manager.shutdown_all();
+    shard_manager.wait_for_all_closed().await;
 
     Ok(())
 }
