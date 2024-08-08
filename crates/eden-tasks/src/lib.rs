@@ -16,7 +16,6 @@ pub mod prelude {
 
     pub use ::async_trait::async_trait;
     pub use ::chrono::TimeDelta;
-    pub use ::serde;
     pub use ::serde::{Deserialize, Serialize};
 }
 

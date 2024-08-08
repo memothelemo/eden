@@ -11,12 +11,12 @@ use twilight_gateway::{Shard, ShardId};
 use super::manager::ShardManagerNotification;
 use super::runner::{ShardHandle, ShardRunner, ShardRunnerMessage};
 use super::ShardManager;
-use crate::{flags, Bot};
+use crate::{flags, BotRef};
 
 /// Monitors all shards
 #[allow(unused)]
 pub struct ShardObserver {
-    bot: Bot,
+    bot: BotRef,
     manager: Arc<ShardManager>,
     rx: Receiver<ShardObserverMessage>,
     settings: Arc<Settings>,
@@ -32,7 +32,7 @@ pub struct ShardObserver {
 impl ShardObserver {
     #[must_use]
     pub fn new(
-        bot: Bot,
+        bot: BotRef,
         manager: Arc<ShardManager>,
         rx: Receiver<ShardObserverMessage>,
         manager_notify_tx: Sender<ShardManagerNotification>,
@@ -121,7 +121,14 @@ impl ShardObserver {
             .build();
 
         let shard = Shard::with_config(id, config);
-        let (runner, handle) = ShardRunner::new(self.bot.clone(), self.notify_tx.clone(), shard);
+        let presence = self.settings.bot.presence.clone();
+        let (runner, handle) = ShardRunner::new(
+            self.bot.clone(),
+            self.manager.clone(),
+            self.notify_tx.clone(),
+            presence,
+            shard,
+        );
 
         eden_utils::tokio::spawn("eden_bot::shard::runner::start", async move {
             runner.run().await;
@@ -185,6 +192,18 @@ impl ShardObserver {
             ShardNotification::Disconnected(id) => {
                 eden_utils::vec::remove_if_exists(&mut self.connected_shards, &id);
                 self.manager.remove_shard(id).await;
+
+                (false, false, id)
+            }
+            ShardNotification::FatalError(id, error) => {
+                eden_utils::vec::remove_if_exists(&mut self.connected_shards, &id);
+                self.manager.remove_shard(id).await;
+
+                let notification = ShardManagerNotification::FatalError(error);
+                if let Err(error) = self.manager_notify_tx.send(notification) {
+                    warn!(%error, "failed to send fatal error notification to the shard manager");
+                }
+
                 (false, false, id)
             }
         };
@@ -242,6 +261,9 @@ pub enum ShardNotification {
     Restarting(ShardId),
     /// A shard is successfully disconnected the gateway connection.
     Disconnected(ShardId),
+    /// A shard got a fatal error and must be alerted to the shard
+    /// manager as soon as possible.
+    FatalError(ShardId, eden_utils::Error),
 }
 
 impl ShardNotification {
@@ -252,6 +274,7 @@ impl ShardNotification {
             Self::Restarting(..) => "restarting",
             Self::Disconnected(..) => "disconnected",
             Self::Connected(..) => "connected",
+            Self::FatalError(..) => "got fatal error",
         }
     }
 
@@ -262,6 +285,7 @@ impl ShardNotification {
             Self::Restarting(id) => *id,
             Self::Disconnected(id) => *id,
             Self::Connected(id) => *id,
+            Self::FatalError(id, ..) => *id,
         }
     }
 }

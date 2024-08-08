@@ -76,6 +76,27 @@ use_cache = false
 # Replace `<insert me>` text with the ID you copied.
 id = "<insert me>"
 
+# The default presence of the bot.
+# 
+# Please refer to the documentation on how to manually configure
+# presences at: https://discord.com/developers/docs/topics/gateway-events#update-presence-gateway-presence-update-structure
+# 
+# If it is not set, it will set into a default presence
+# where no much activity is set for the bot.
+[bot.presence]
+status = "idle"
+afk = true
+
+[[bot.presence.activities]]
+# Type 0 means playing
+type = 0
+name = "with Ferris"
+# Use this if the type is 1 only
+# url = "..."
+
+# created_at = 0 (use Unix timestamps for this field)
+# And many more...
+
 # Parameters for sharding.
 # 
 # **Do not modify if you don't know anything about sharding in Discord API**
@@ -94,7 +115,7 @@ id = "<insert me>"
 # - 
 #     type = "single"
 #     # Assigned id for a single shard/instance
-#     id = 123
+#     id = 0
 #     
 #     # Total amount of shards needed to be utilized for the bot.
 #     total = 1

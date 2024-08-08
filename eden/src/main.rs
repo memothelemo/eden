@@ -1,21 +1,15 @@
-use eden_bot::shard::ShardManager;
-use eden_bot::Bot;
 use eden_settings::Settings;
 use eden_utils::error::exts::*;
 use eden_utils::Result;
 use std::sync::Arc;
 
 async fn bootstrap(settings: Settings) -> Result<()> {
-    let bot = Bot::new(Arc::new(settings));
-    let shard_manager = ShardManager::new(bot.clone());
-    shard_manager.start_all();
-    shard_manager.wait_for_all_connected().await;
+    let result = tokio::try_join!(eden_bot::start(Arc::new(settings)), async {
+        eden_utils::shutdown::catch_signals().await;
+        Ok(())
+    });
 
-    eden_utils::shutdown::catch_signals().await;
-    shard_manager.shutdown_all();
-    shard_manager.wait_for_all_closed().await;
-
-    Ok(())
+    result.map(|(_, bot)| bot).anonymize_error()
 }
 
 fn start() -> Result<()> {

@@ -2,6 +2,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use eden_utils::sql::util::{naive_to_dt, SqlSnowflake};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::ops::Deref;
 use twilight_model::id::{marker::GuildMarker, Id};
 use typed_builder::TypedBuilder;
 
@@ -28,6 +29,14 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for GuildSettingsRow {
             updated_at: updated_at.map(naive_to_dt),
             data: data.0,
         })
+    }
+}
+
+impl Deref for GuildSettingsRow {
+    type Target = GuildSettings;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
     }
 }
 

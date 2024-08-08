@@ -2,26 +2,32 @@ use eden_settings::Settings;
 use eden_tasks::QueueWorker;
 use sqlx::postgres::PgPoolOptions;
 use std::fmt::Debug;
-use std::mem::MaybeUninit;
 use std::ops::Deref;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Weak;
 use std::sync::{atomic::AtomicU64, Arc};
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_http::client::InteractionClient;
 use twilight_model::id::{marker::ApplicationMarker, Id};
 
+use crate::shard::ShardManager;
+
 // involves database functionality for Bot struct.
 mod database;
+// useful functions that will make my life easier
+mod util;
 
 pub struct BotInner {
     pub cache: Arc<InMemoryCache>,
     pub http: Arc<twilight_http::Client>,
-    pub queue: QueueWorker<Bot>,
+    pub queue: BotQueue,
+    pub shard_manager: Arc<ShardManager>,
     pub settings: Arc<Settings>,
 
     // Since application IDs are just u64 values, we can retain it
     // as long as it is a valid Twilight application ID.
     application_id: AtomicU64,
+    is_local_guild_loaded: AtomicBool,
     pool: sqlx::PgPool,
 }
 
@@ -72,34 +78,29 @@ impl Bot {
             })
             .connect_lazy_with(connect_options);
 
-        // SAFETY: The bot object (state for the queue object) will not be
-        //         used when QueueWorker::builder().build() is called and registered
-        //         all required tasks with 'crate::tasks::register_all'.
-        //
-        //         The inner value of the Bot object will be eventually replaced
-        //         since we want to have queue obect stored with `Bot` as its state
-        //         at the same time keep the queue inside the Bot object.
-        let inner = Arc::new_zeroed();
-        let bot = Bot(unsafe { inner.clone().assume_init() });
-
-        let worker_id = settings.worker.id;
-        let queue = QueueWorker::new(worker_id, pool.clone(), &settings.worker, bot.clone());
-        let queue = crate::tasks::register_all_tasks(queue);
-
-        unsafe {
-            let inner = &mut *(Arc::as_ptr(&inner) as *mut MaybeUninit<BotInner>);
-            inner.write(BotInner {
+        let inner = Arc::<BotInner>::new_cyclic(move |bot_weak| {
+            let bot_weak = BotRef(bot_weak.clone());
+            let queue = crate::tasks::register_all_tasks(QueueWorker::new(
+                settings.worker.id,
+                pool.clone(),
+                &settings.worker,
+                bot_weak.clone(),
+            ));
+            let shard_manager = ShardManager::new(bot_weak.clone(), settings.clone());
+            BotInner {
                 // no application id of 0 in twilight-model will accept this
                 application_id: AtomicU64::new(0),
                 cache,
+                is_local_guild_loaded: AtomicBool::new(false),
                 http,
-                pool,
                 queue,
+                shard_manager,
                 settings,
-            });
-        }
+                pool,
+            }
+        });
 
-        bot
+        Self(inner)
     }
 
     /// Gets the resolved application ID if it is loaded.
@@ -115,11 +116,20 @@ impl Bot {
     }
 
     #[must_use]
+    pub fn is_local_guild_loaded(&self) -> bool {
+        self.is_local_guild_loaded.load(Ordering::Relaxed)
+    }
+
+    #[must_use]
     pub fn interaction(&self) -> InteractionClient<'_> {
         let Some(application_id) = self.application_id() else {
             panic!("tried to call bot.interaction while the bot is not ready");
         };
         self.0.http.interaction(application_id)
+    }
+
+    pub(crate) fn on_local_guild_loaded(&self) {
+        self.is_local_guild_loaded.store(true, Ordering::Relaxed);
     }
 
     pub(crate) fn override_application_id(&self, id: Id<ApplicationMarker>) {
@@ -150,6 +160,36 @@ impl Debug for Bot {
     }
 }
 
+/// A weak reference version of the actual [`Bot`] object.
+///
+/// This type exists in the first place is to avoid memory cyclic
+/// reference issues with Eden while trying to use the `unsafe`
+/// method to get around cyclic references.
+#[derive(Clone)]
+pub struct BotRef(Weak<BotInner>);
+
+impl std::fmt::Debug for BotRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bot").finish_non_exhaustive()
+    }
+}
+
+impl BotRef {
+    /// Converts a weak reference of [`Bot`] object into the actual
+    /// [`Bot`] object itself.
+    #[allow(clippy::expect_used)]
+    pub fn get(&self) -> Bot {
+        let inner = self
+            .0
+            .upgrade()
+            .expect("unexpected drop from Arc<BotInner>");
+
+        Bot(inner)
+    }
+}
+
+pub(crate) type BotQueue = QueueWorker<BotRef>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,15 +210,6 @@ mod tests {
         let settings = Arc::new(settings);
         let bot = Bot::new(settings.clone());
         assert_eq!(bot.is_cache_enabled(), false);
-    }
-
-    #[tokio::test]
-    async fn should_not_throw_segfault_if_used_state() {
-        let settings = Arc::new(crate::tests::generate_fake_settings());
-        let bot = Bot::new(settings.clone());
-
-        let returned = &bot.queue.get_state().settings;
-        assert_eq!(settings.threads, returned.threads);
     }
 
     #[tokio::test]

@@ -30,15 +30,15 @@ pub fn init(settings: &Settings) -> Result<()> {
     let log_layer = match settings.logging.style {
         LoggingStyle::Compact => tracing_subscriber::fmt::layer()
             .compact()
-            // .without_time()
+            .without_time()
             .boxed(),
         LoggingStyle::Pretty => tracing_subscriber::fmt::layer()
             .pretty()
-            // .without_time()
+            .without_time()
             .boxed(),
         LoggingStyle::JSON => tracing_subscriber::fmt::layer()
             .json()
-            // .without_time()
+            .without_time()
             .boxed(),
     }
     .with_filter(env_filter);

@@ -4,9 +4,11 @@ use eden_utils::types::{ProtectedString, Sensitive};
 use eden_utils::{Error, ErrorCategory, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::num::NonZeroU64;
 use std::time::Duration;
+use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
 use typed_builder::TypedBuilder;
@@ -37,6 +39,21 @@ pub struct Bot {
     /// advantage of full capabilties of Eden.
     #[serde(alias = "local_server")]
     pub local_guild: LocalGuild,
+
+    /// The default presence of the bot.
+    ///
+    /// Please refer to the documentation on how to manually configure
+    /// presences at: https://discord.com/developers/docs/topics/gateway-events#update-presence-gateway-presence-update-structure
+    ///
+    /// If it is not set, it will set into a default presence
+    /// where no much activity is set for the bot.
+    #[builder(default)]
+    #[doku(
+        as = "HashMap<String, String>",
+        example = "status = \"idle\"\nafk = true\n\n[[bot.presence.activities]]\n# Type 0 means playing\ntype = 0\nname = \"with Ferris\"\n# Use this if the type is 1 only\n# url = \"...\"\n\n# created_at = 0 (use Unix timestamps for this field)\n# And many more..."
+    )]
+    #[serde(default)]
+    pub presence: Option<UpdatePresencePayload>,
 
     /// Parameters for sharding.
     ///

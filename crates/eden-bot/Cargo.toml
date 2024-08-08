@@ -15,11 +15,17 @@ eden-tasks.workspace = true
 eden-utils.workspace = true
 
 chrono.workspace = true
+fancy-duration.workspace = true
 futures.workspace = true
+serde.workspace = true
 sqlx.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
+
+itertools = "0.13.0"
+strip-ansi-escapes = "0.2.0"
 
 # twilight crates
 twilight-cache-inmemory = { version = "0.15.4", features = ["permission-calculator"] }

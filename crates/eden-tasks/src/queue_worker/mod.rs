@@ -156,18 +156,13 @@ impl<S: Clone + Send + Sync + 'static> QueueWorker<S> {
         let mut setup_later = result.is_err() && result.is_pool_error();
         if setup_later {
             warn!(
-                concurrency = %self.0.max_running_tasks,
-                "starting worker {} with an unhealthy database",
+                "starting queue worker {} with an unhealthy database",
                 self.0.id
             );
             setup_later = true;
         } else if result.is_err() {
             result?;
-            debug!(
-                concurrency = %self.0.max_running_tasks,
-                "starting worker {}",
-                self.0.id
-            );
+            debug!("starting queue worker {}", self.0.id);
         }
 
         let registry = &self.0.registry;

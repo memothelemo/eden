@@ -1,29 +1,34 @@
-use eden_utils::shutdown::ShutdownMode;
+use eden_utils::error::exts::{AnyErrorExt, ErrorExt};
+use eden_utils::{Error, ErrorCategory};
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::mpsc::{self, UnboundedReceiver as Receiver, UnboundedSender as Sender};
 use tokio::sync::{Mutex, MutexGuard};
 use tokio_util::task::TaskTracker;
 use tracing::{debug, trace, warn, Instrument, Span};
 use twilight_gateway::error::ReceiveMessageErrorType;
 use twilight_gateway::{CloseFrame, ConnectionStatus, Event, EventType, Latency, Shard, ShardId};
+use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
+use twilight_model::gateway::payload::outgoing::UpdatePresence;
 use twilight_model::gateway::presence::{Activity, Status};
 
 use super::observer::ShardNotification;
-use super::PresenceData;
+use super::{PresenceData, ShardManager};
 use crate::events::EventContext;
-use crate::Bot;
+use crate::BotRef;
 
 pub struct ShardRunner {
-    bot: Bot,
+    bot: BotRef,
     // We need the handle to manipulate something
     // with `latency` and `status` fields.
     handle: ShardHandle,
+    manager: Arc<ShardManager>,
     observer: Sender<ShardNotification>,
     runner_rx: Receiver<ShardRunnerMessage>,
 
     ///////////////////////////////////////////////
     id: ShardId,
-    presence: PresenceData,
+    presence: UpdatePresencePayload,
     last_status: ConnectionStatus,
     shard: Shard,
     tasks: TaskTracker,
@@ -31,7 +36,13 @@ pub struct ShardRunner {
 
 impl ShardRunner {
     #[must_use]
-    pub fn new(bot: Bot, observer: Sender<ShardNotification>, shard: Shard) -> (Self, ShardHandle) {
+    pub fn new(
+        bot: BotRef,
+        manager: Arc<ShardManager>,
+        observer: Sender<ShardNotification>,
+        presence: Option<UpdatePresencePayload>,
+        shard: Shard,
+    ) -> (Self, ShardHandle) {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let handle = ShardHandle {
@@ -45,19 +56,20 @@ impl ShardRunner {
             bot,
             handle: handle.clone(),
             observer,
+            manager,
             runner_rx: rx,
             tasks: TaskTracker::new(),
 
             id: shard.id(),
             last_status: shard.status().clone(),
-            presence: PresenceData::default(),
+            presence: presence.unwrap_or_else(|| PresenceData::default().into()),
             shard,
         };
 
         (runner, handle)
     }
 
-    #[tracing::instrument(skip_all, level = "debug", fields(shard.id = %self.shard.id()))]
+    #[tracing::instrument(skip_all, fields(shard.id = %self.shard.id()))]
     pub async fn run(mut self) {
         debug!("starting shard {}", self.shard.id());
         loop {
@@ -71,8 +83,22 @@ impl ShardRunner {
 
             let action = self.next_action().await;
             let event = match action {
-                ShardAction::Shutdown(graceful) => {
-                    self.shutdown(graceful).await;
+                ShardAction::Shutdown(ShutdownReason::Graceful) => {
+                    self.shutdown(true).await;
+                    return;
+                }
+                ShardAction::Shutdown(ShutdownReason::Abort) => {
+                    self.shutdown(false).await;
+                    return;
+                }
+                ShardAction::Shutdown(ShutdownReason::FatalError(error)) => {
+                    self.shutdown(true).await;
+                    if let Err(error) = self
+                        .observer
+                        .send(ShardNotification::FatalError(self.id, error))
+                    {
+                        warn!(%error, "could not notify shard observer that the shard {} got a fatal error", self.id);
+                    }
                     return;
                 }
                 ShardAction::Continue => continue,
@@ -88,12 +114,14 @@ impl ShardRunner {
                 if let Err(error) = self.observer.send(ShardNotification::Connected(self.id)) {
                     warn!(%error, "could not notify shard observer that the shard {} is connected to the gateway", self.id);
                 }
+                // update their presence while it is ready
+                self.update_presence().await;
             }
             trace!("received event {:?}", event.kind());
 
             let span = Span::current();
             let ctx = EventContext {
-                bot: self.bot.clone(),
+                bot: self.bot.get(),
                 latency: self.shard.latency().clone(),
                 shard: self.handle.clone(),
             };
@@ -113,20 +141,33 @@ impl ShardRunner {
             Left((Err(source), ..)) => {
                 log_shard_error!(source);
                 if source.is_fatal() {
-                    eden_utils::shutdown::trigger(ShutdownMode::Graceful).await;
-                    ShardAction::Shutdown(true)
+                    self.manager.shutdown_all();
+
+                    let source = Error::any(ErrorCategory::Unknown, source)
+                        .change_context(GatewayFatalError)
+                        .attach_printable(format!("with shard id: {}", self.id))
+                        .anonymize();
+
+                    ShardAction::Shutdown(ShutdownReason::FatalError(source))
                 } else {
                     ShardAction::Continue
                 }
             }
-            Right((Some(ShardRunnerMessage::Abort), ..)) => ShardAction::Shutdown(false),
-            Right((Some(ShardRunnerMessage::Shutdown), ..)) => ShardAction::Shutdown(true),
+            Right((Some(ShardRunnerMessage::Abort), ..)) => {
+                ShardAction::Shutdown(ShutdownReason::Abort)
+            }
+            Right((Some(ShardRunnerMessage::Shutdown), ..)) => {
+                ShardAction::Shutdown(ShutdownReason::Graceful)
+            }
             Right((Some(ShardRunnerMessage::SetActivites(activities)), ..)) => {
-                self.presence.activites = activities;
+                self.presence.activities = activities;
                 ShardAction::UpdatePresence
             }
             Right((Some(ShardRunnerMessage::SetPresence(presence)), ..)) => {
-                self.presence = presence;
+                self.presence.activities = presence.activities;
+                self.presence.afk = presence.afk;
+                self.presence.since = presence.since.map(|v| v.timestamp_millis() as u64);
+                self.presence.status = presence.status;
                 ShardAction::UpdatePresence
             }
             Right((Some(ShardRunnerMessage::SetStatus(status)), ..)) => {
@@ -135,12 +176,18 @@ impl ShardRunner {
             }
             Right((None, ..)) => {
                 warn!("self.runner_rx is dropped. closing shard");
-                ShardAction::Shutdown(true)
+                ShardAction::Shutdown(ShutdownReason::Graceful)
             }
         }
     }
 
     async fn close_shard(&mut self) {
+        // Don't need for absolutely shutdown the WebSocket connection if a shard
+        // is fatally closed its connection to the Discord gateway
+        if self.shard.status().is_fatally_closed() {
+            return;
+        }
+
         if let Err(error) = self.shard.close(CloseFrame::NORMAL).await {
             tracing::warn!(%error, "failed to close shard connection for {}", self.id);
         }
@@ -209,10 +256,12 @@ impl ShardRunner {
     }
 
     async fn update_presence(&mut self) {
-        // We're manually creating update presence since twilight
-        // won't allow us to use `new` function without getting an error
-        // if an empty set of activities is provided.
-        let payload = self.presence.transform();
+        debug!("updating presence");
+
+        let payload = UpdatePresence {
+            d: self.presence.clone(),
+            op: twilight_model::gateway::OpCode::PresenceUpdate,
+        };
         if let Err(error) = self.shard.command(&payload).await {
             warn!(%error, "failed to update bot's presence");
         }
@@ -222,7 +271,7 @@ impl ShardRunner {
 macro_rules! log_shard_error {
     ($source:expr) => {
         if $source.is_fatal() {
-            tracing::error!(error = %$source, "got fatal shard error");
+            tracing::error!(error = %$source, "got shard fatal error");
         } else {
             tracing::warn!(error = %$source, "got shard error");
         }
@@ -326,6 +375,10 @@ impl ShardRunnerMessage {
     }
 }
 
+#[derive(Debug, Error)]
+#[error("could not successfully connect to the gateway")]
+struct GatewayFatalError;
+
 /// What will [`ShardRunner`] do after the next WebSocket
 /// message is processed.
 #[derive(Debug)]
@@ -333,9 +386,18 @@ enum ShardAction {
     /// Continue the loop as usual
     Continue,
     /// The inner value determines if it should close gracefully.
-    Shutdown(bool),
+    Shutdown(ShutdownReason),
     /// The shard should handle a new received event from the Discord gateway.
     NewEvent(Event),
     /// The shard must update the bot's presence.
     UpdatePresence,
+}
+
+/// Reasons why shutdown needs to be done
+#[derive(Debug)]
+enum ShutdownReason {
+    /// A shard got a fatal error
+    FatalError(eden_utils::Error),
+    Graceful,
+    Abort,
 }

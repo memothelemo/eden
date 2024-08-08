@@ -15,6 +15,17 @@ impl Suggestion {
         let message = message.to_string();
         Self(Cow::Owned(message))
     }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.as_ref()
+    }
+}
+
+impl AsRef<str> for Suggestion {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
 }
 
 impl Suggestion {

@@ -1,6 +1,5 @@
 use eden_settings::{Bot, Database, LocalGuild, Settings};
 use eden_utils::error::exts::*;
-use eden_utils::error::tags::Suggestion;
 use eden_utils::types::Sensitive;
 use twilight_model::id::Id;
 
@@ -9,9 +8,10 @@ pub fn generate_real_settings() -> Settings {
         Ok(n) => n,
         Err(error) => {
             eden_utils::Error::init();
-            let error = error.anonymize().attach(Suggestion::new(
-                "Make sure to configure your Eden development environment before running tests",
-            ));
+            let error = error
+                .anonymize()
+                .attach(crate::suggestions::DEV_ENV_NOT_SET_UP);
+
             panic!("Cannot load settings: {error}");
         }
     }
