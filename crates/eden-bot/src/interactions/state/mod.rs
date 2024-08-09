@@ -135,6 +135,7 @@ impl From<Id<InteractionMarker>> for MaybeInteractionId {
 #[derive(Debug)]
 pub struct CommandState {
     pub kind: StatefulCommandType,
+    #[allow(unused)]
     pub invoked_at: DateTime<Utc>,
     pub last_used_at: DateTime<Utc>,
 }
