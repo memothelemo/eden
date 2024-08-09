@@ -26,7 +26,7 @@ pub fn init(settings: &Settings) -> Option<EdenSentryGuard> {
     info!(
         sentry.environment = ?settings.environment,
         sentry.traces_sample_rate = %settings.traces_sample_rate,
-        "Sentry integration is enabled"
+        "sentry integration is enabled"
     );
 
     let traces_sample_rate = settings.traces_sample_rate;

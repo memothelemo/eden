@@ -29,6 +29,19 @@ pub fn init(settings: &Settings) -> Result<()> {
         .attach_printable("could not parse log targets")
         .attach(Suggestion::new(DIRECTIVES_SUGGESTION))?;
 
+    let sentry_filter = if let Some(sentry) = settings.sentry.as_ref() {
+        let filter = tracing_subscriber::EnvFilter::builder()
+            .with_default_directive(LevelFilter::INFO.into())
+            .parse(&sentry.targets)
+            .into_typed_error()
+            .attach_printable("could not parse log targets for `sentry.targets`")
+            .attach(Suggestion::new(DIRECTIVES_SUGGESTION))?;
+
+        Some(filter)
+    } else {
+        None
+    };
+
     let log_layer = match settings.logging.style {
         LoggingStyle::Compact => tracing_subscriber::fmt::layer()
             .compact()
@@ -47,7 +60,7 @@ pub fn init(settings: &Settings) -> Result<()> {
 
     let sentry_layer = sentry::integrations::tracing::layer()
         .event_filter(event_filter)
-        .with_filter(LevelFilter::DEBUG);
+        .with_filter(sentry_filter);
 
     let subscriber = tracing_subscriber::Registry::default()
         .with(log_layer)
@@ -62,9 +75,11 @@ pub fn init(settings: &Settings) -> Result<()> {
 }
 
 fn event_filter(metadata: &Metadata<'_>) -> EventFilter {
+    let has_error = metadata.fields().iter().any(|v| v.name() == "error");
     match metadata.level() {
         &Level::ERROR => EventFilter::Exception,
-        &Level::WARN => EventFilter::Event,
+        &Level::WARN if has_error => EventFilter::Exception,
+        &Level::WARN => EventFilter::Breadcrumb,
         &Level::INFO | &Level::DEBUG | &Level::TRACE => EventFilter::Breadcrumb,
     }
 }

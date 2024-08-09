@@ -71,20 +71,18 @@ impl Task for AlertPayment {
             .await
             .attach_printable("failed to send message to the alert channel");
 
-        if let Some(info) = result.discord_http_error_info() {
-            if info.has_missing_access() {
-                let request = bot
-                    .http
-                    .create_message(self.biller_dm_channel_id)
-                    .content(OOPS_MSG)
-                    .unwrap();
+        if result.discord_http_error_info().is_some() {
+            let request = bot
+                .http
+                .create_message(self.biller_dm_channel_id)
+                .content(OOPS_MSG)
+                .unwrap();
 
-                request_for_model(&bot.http, request)
-                    .await
-                    .attach_printable("failed to send error message to the biller")?;
+            request_for_model(&bot.http, request)
+                .await
+                .attach_printable("failed to send error message to the biller")?;
 
-                return Ok(TaskResult::Reject(result.unwrap_err().anonymize()));
-            }
+            return Ok(TaskResult::Reject(result.unwrap_err().anonymize()));
         }
         result?;
 

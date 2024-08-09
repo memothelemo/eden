@@ -16,6 +16,19 @@ pub struct Sentry {
     #[serde(alias = "env")]
     #[serde(default = "Sentry::default_environment")]
     pub environment: String,
+    /// This property filters spans and events based on the
+    /// set of directives.
+    ///
+    /// You may refer on how directives work and parse by going to:
+    /// https://docs.rs/tracing-subscriber/0.3.18/tracing_subscriber/filter/struct.EnvFilter.html
+    ///
+    /// The default value is a blank string, if not set.
+    ///
+    /// The default value will filter only events and spans that
+    /// have `info` level.
+    #[doku(example = "info")]
+    #[serde(default = "Sentry::default_targets")]
+    pub targets: String,
     #[doku(example = "1")]
     #[serde(default = "Sentry::default_traces_sample_rate")]
     pub traces_sample_rate: f32,
@@ -24,6 +37,10 @@ pub struct Sentry {
 impl Sentry {
     fn default_environment() -> String {
         String::from(eden_utils::build::PROFILE)
+    }
+
+    fn default_targets() -> String {
+        String::from("info")
     }
 
     fn default_traces_sample_rate() -> f32 {
