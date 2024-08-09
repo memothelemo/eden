@@ -1,0 +1,27 @@
+# Build files
+/target
+
+# IDE and user configuration
+.vscode
+.idea
+.DS_Store
+
+# Docker itself
+.dockerignore
+Dockerfile
+
+# Git files
+.git
+.gitignore
+
+# Rust nightly crash files
+rustc-ice-*
+
+# Configuration and settings (including eden file itself)
+/config
+eden.toml
+eden.*.toml
+!eden.example.toml
+
+# Local environment files
+.env

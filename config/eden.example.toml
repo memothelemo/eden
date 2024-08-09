@@ -76,6 +76,9 @@ use_cache = false
 # Replace `<insert me>` text with the ID you copied.
 id = "<insert me>"
 
+# Alert admin channel.
+alert_channel_id = "<insert me>"
+
 # The default presence of the bot.
 # 
 # Please refer to the documentation on how to manually configure
@@ -207,6 +210,12 @@ style = "compact"
 # The default value will filter only events and spans that
 # have `info` level.
 targets = "info"
+# Optional
+
+[sentry]
+dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
+environment = "release"
+traces_sample_rate = 123.45
 
 [worker]
 # Assigned queue worker ID. This field allows for the entire

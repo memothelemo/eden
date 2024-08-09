@@ -17,6 +17,9 @@ eden-settings = { path = "crates/eden-settings" }
 eden-tasks = { path = "crates/eden-tasks" }
 eden-utils = { path = "crates/eden-utils" }
 
+# other external APIs
+sentry = { version = "0.32.0", default-features = false, features = ["backtrace", "contexts", "reqwest", "tracing", "rustls"] }
+
 # types
 chrono = { version = "0.4.38", features = ["serde"] }
 dashmap = "6.0.1"

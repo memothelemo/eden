@@ -2,7 +2,9 @@ use eden_settings::{LoggingStyle, Settings};
 use eden_utils::build;
 use eden_utils::error::tags::Suggestion;
 use eden_utils::{error::exts::*, Result};
+use sentry::integrations::tracing::EventFilter;
 use tracing::level_filters::LevelFilter;
+use tracing::{Level, Metadata};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt, Layer};
 
@@ -43,8 +45,13 @@ pub fn init(settings: &Settings) -> Result<()> {
     }
     .with_filter(env_filter);
 
+    let sentry_layer = sentry::integrations::tracing::layer()
+        .event_filter(event_filter)
+        .with_filter(LevelFilter::DEBUG);
+
     let subscriber = tracing_subscriber::Registry::default()
         .with(log_layer)
+        .with(sentry_layer)
         .with(ErrorLayer::default());
 
     tracing::subscriber::set_global_default(subscriber)
@@ -52,6 +59,14 @@ pub fn init(settings: &Settings) -> Result<()> {
         .attach_printable("unable to setup tracing")?;
 
     Ok(())
+}
+
+fn event_filter(metadata: &Metadata<'_>) -> EventFilter {
+    match metadata.level() {
+        &Level::ERROR => EventFilter::Exception,
+        &Level::WARN => EventFilter::Event,
+        &Level::INFO | &Level::DEBUG | &Level::TRACE => EventFilter::Breadcrumb,
+    }
 }
 
 /// Installs error from across all crates of Eden project.

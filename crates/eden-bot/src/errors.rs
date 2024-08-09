@@ -5,6 +5,10 @@ use thiserror::Error;
 pub struct StartBotError;
 
 #[derive(Debug, Error)]
+#[error("could not perform database migrations")]
+pub struct MigrateError;
+
+#[derive(Debug, Error)]
 #[error("could not update local guild admins")]
 pub struct UpdateLocalGuildAdminsError;
 

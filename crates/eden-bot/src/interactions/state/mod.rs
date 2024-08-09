@@ -76,7 +76,7 @@ impl InMemoryCommandState {
 
     #[tracing::instrument(skip_all)]
     pub async fn clear_inactive(&self) {
-        debug!("clearing all inactive interactions' state");
+        trace!("clearing all inactive interactions' state");
 
         let mut to_delete = Vec::new();
         let now = Utc::now();
@@ -101,7 +101,7 @@ impl InMemoryCommandState {
             self.items.remove(&id);
         }
 
-        debug!("cleared {to_delete_len} inactive interaction states");
+        trace!("cleared {to_delete_len} inactive interaction states");
     }
 }
 

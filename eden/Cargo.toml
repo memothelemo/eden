@@ -13,6 +13,7 @@ eden-tasks.workspace = true
 eden-utils.workspace = true
 
 nu-ansi-term = "0.50.1"
+sentry.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-error.workspace = true

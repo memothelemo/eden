@@ -19,6 +19,7 @@ dashmap.workspace = true
 fancy-duration.workspace = true
 futures.workspace = true
 serde.workspace = true
+sentry.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

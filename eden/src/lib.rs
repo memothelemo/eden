@@ -2,6 +2,7 @@ use eden_settings::Settings;
 use eden_utils::build;
 
 pub mod logging;
+pub mod sentry;
 
 pub fn print_launch(settings: &Settings) {
     use nu_ansi_term::{Color, Style};

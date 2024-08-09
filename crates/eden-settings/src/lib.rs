@@ -16,10 +16,12 @@ mod bot;
 mod database;
 mod error;
 mod logging;
+mod sentry;
 
 pub use self::bot::*;
 pub use self::database::*;
 pub use self::logging::*;
+pub use self::sentry::*;
 
 pub use self::error::SettingsLoadError;
 pub use eden_tasks::Settings as Worker;
@@ -32,6 +34,10 @@ pub struct Settings {
     #[builder(default)]
     #[serde(default)]
     pub logging: Logging,
+
+    #[builder(default)]
+    #[serde(default)]
+    pub sentry: Option<Sentry>,
 
     #[builder(default)]
     #[serde(default)]
@@ -96,6 +102,10 @@ impl Settings {
 
         settings.path = resolved_path;
         settings.bot.sharding.check()?;
+
+        if let Some(sentry) = settings.sentry.as_ref() {
+            sentry.check()?;
+        }
 
         Ok(settings)
     }
