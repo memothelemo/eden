@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*", "eden"]
+members = ["crates/*", "eden", "xtask"]
 resolver = "2"
 
 [workspace.package]
@@ -11,10 +11,11 @@ rust-version = "1.79.0"
 
 [workspace.dependencies]
 # eden crates
-eden-bot = { path = "crates/bot" }
-eden-db = { path = "crates/database" }
-eden-tasks = { path = "crates/tasks" }
-eden-utils = { path = "crates/utils" }
+eden-bot = { path = "crates/eden-bot" }
+eden-schema = { path = "crates/eden-schema" }
+eden-settings = { path = "crates/eden-settings" }
+eden-tasks = { path = "crates/eden-tasks" }
+eden-utils = { path = "crates/eden-utils" }
 
 # types
 chrono = { version = "0.4.38", features = ["serde"] }
@@ -25,12 +26,16 @@ uuid = { version = "1.10.0", features = ["serde", "v4"] }
 
 # core crates
 error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "f52d870" }
+typed-builder = "0.18.2"
 
 # macros
 paste = "1.0.15"
 thiserror = "1.0.61"
 
 # user configuration
+clap = { version = "4.5.13", features = ["derive"] }
+config = { version = "0.14.0", features = ["convert-case", "preserve_order", "toml"], default-features = false }
+doku = "0.21.1"
 dotenvy = "0.15.7"
 
 # serialization, encoding and compression
@@ -43,7 +48,7 @@ sha2 = "0.10.8"
 # async related
 async-trait = "0.1.80"
 futures = "0.3.30"
-once_cell = "1.19.0"
+pin-project-lite = "0.2.14"
 tokio = { version = "1.38.0", features = ["full", "tracing"] }
 tokio-util = { version = "0.7.11", features = ["full"] }
 
@@ -52,10 +57,12 @@ tracing = { version = "0.1.40", features = ["log"] }
 tracing-error = "0.2.0"
 
 # twilight crates
+twilight-http = { version = "0.15.4", default-features = false, features = ["rustls-native-roots", "decompression"] }
 twilight-model = "0.15.4"
 twilight-interactions = "0.15.2"
 
 # testing
+serde_test = "1.0.176"
 static_assertions = "1.1.0"
 
 [workspace.dependencies.sqlx]

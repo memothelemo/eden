@@ -1,42 +1,35 @@
-#![feature(result_flattening)]
-use eden_bot::error::StartBotError;
-use eden_bot::Settings;
-use eden_utils::error::ResultExt;
+use eden_settings::Settings;
+use eden_utils::error::exts::*;
+use eden_utils::Result;
+use std::sync::Arc;
 
-#[allow(clippy::unnecessary_wraps, clippy::unwrap_used, clippy::unused_async)]
-async fn bootstrap(settings: Settings) -> eden_utils::Result<()> {
-    let settings = std::sync::Arc::new(settings);
-    let result = tokio::try_join!(eden_bot::start(settings), async {
+async fn bootstrap(settings: Settings) -> Result<()> {
+    let result = tokio::try_join!(eden_bot::start(Arc::new(settings)), async {
         eden_utils::shutdown::catch_signals().await;
         Ok(())
     });
 
-    result
-        .map(|(_, bot)| bot)
-        .change_context(StartBotError)
-        .attach_printable("failed to process threads")?;
-
-    Ok(())
+    result.map(|(_, bot)| bot).anonymize_error()
 }
 
-#[allow(clippy::unwrap_used)]
-fn start() -> eden_utils::Result<()> {
+fn start() -> Result<()> {
     let settings = Settings::from_env()?;
 
-    #[cfg(release)]
     eden::print_launch(&settings);
-    eden::diagnostics::init(&settings)?;
+    eden::logging::init(&settings)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .worker_threads(settings.workers())
+        .worker_threads(settings.threads)
         .build()
-        .unwrap()
+        .into_typed_error()
+        .attach_printable("could not build tokio runtime")?
         .block_on(bootstrap(settings))
 }
 
+#[allow(clippy::unwrap_used)]
 fn main() {
-    eden::install_prerequisite_hooks();
+    eden::logging::install_hooks();
 
     if let Err(error) = start() {
         eprintln!("{error}");

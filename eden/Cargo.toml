@@ -8,20 +8,16 @@ rust-version.workspace = true
 
 [dependencies]
 eden-bot.workspace = true
-eden-db.workspace = true
+eden-settings.workspace = true
 eden-tasks.workspace = true
 eden-utils.workspace = true
 
-sqlx.workspace = true
-thiserror.workspace = true
-tokio.workspace = true
-
 nu-ansi-term = "0.50.1"
+tokio.workspace = true
 tracing.workspace = true
 tracing-error.workspace = true
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
-clap = { version = "4.5.11", features = ["derive"] }
 
 [lints]
 workspace = true

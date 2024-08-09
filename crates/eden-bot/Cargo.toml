@@ -1,0 +1,43 @@
+[package]
+name = "eden-bot"
+description = "Implementation of Eden Discord bot."
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+eden-discord-types = { path = "../eden-discord-types" }
+eden-schema = { path = "../eden-schema" }
+eden-settings.workspace = true
+eden-tasks.workspace = true
+eden-utils.workspace = true
+
+chrono.workspace = true
+dashmap.workspace = true
+fancy-duration.workspace = true
+futures.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+
+# reqwest = "*"
+itertools = "0.13.0"
+strip-ansi-escapes = "0.2.0"
+
+# twilight crates
+twilight-cache-inmemory = { version = "0.15.4", features = ["permission-calculator"] }
+twilight-gateway = { version = "0.15.4", features = ["rustls-native-roots", "zlib-simd"] }
+twilight-http.workspace = true
+twilight-mention = "0.15.3"
+twilight-model.workspace = true
+twilight-interactions.workspace = true
+twilight-util = { version = "0.15.2", features = ["builder", "permission-calculator", "snowflake"] }
+reqwest = { version = "0.12.5", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "rustls-tls-webpki-roots", "brotli", "zstd", "deflate"] }
+
+[lints]
+workspace = true

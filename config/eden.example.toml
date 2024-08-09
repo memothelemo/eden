@@ -1,0 +1,247 @@
+# How many CPU threads which Eden will utilize.
+# 
+# The good rule of thumb when setting the amount of CPU threads
+# is ideally you want to have it at least 2 cores (one for the gateway
+# and one for the task queueing system).
+# 
+# Unless, if you want to start Eden instance with many shards to or your bot
+# needs to cater a lot of members in your guild/server, you may want to adjust
+# it up to 4 to 8.
+# 
+# The default if not set is the total actual amount of your CPU cores
+# divided by 2 (spare for the operating system). If the CPU however, is a single
+# core, it will utilize one core only.
+threads = 2
+
+[bot]
+# This token used to connect and interact with the Discord API.
+# 
+# **DO NOT SHARE THIS TOKEN TO ANYONE!**
+# 
+# Your token served as your password to let Discord know that your
+# bot is trying to interact with Discord. Exposing your Discord bot
+# token to the public can get access to your bot possibly ruin
+# anyone's server/guild!
+token = "<insert token here>"
+
+# Parameters for configuring what Eden should behave when
+# it interacts with Discord's REST/HTTP API.
+# 
+# **Do not modify if you don't know anything about HTTP or how Discord HTTP API works.**
+[bot.http]
+# Proxy server to use for all HTTP(S) requests.
+proxy = "localhost:1234"
+
+# Whether Eden should use HTTP instead of HTTPS to connect
+# through the proxy server.
+# 
+# The default value is true if not set.
+proxy_use_http = true
+
+# Timeout for every HTTP requests
+# 
+# The default value is 10 seconds if not set.
+timeout = "30m"
+
+# Using cache allows Eden to minimize amount of REST/HTTP API requests,
+# requesting too much will lead to ratelimits.
+# 
+# You may use cache if you don't care about the RAM usage of your
+# bot, somewhat likely to have outdated data and minimizing the amount
+# of REST/HTTP API as much as possible, you can enable caching.
+# 
+# If you want to run Eden with lowest RAM usage as possible,
+# you may not want to use caching.
+# 
+# The default value is false if not set.
+use_cache = false
+
+# "Local guild/server" is where most of Eden's functionality so forth take place
+# such as payment processes, administration, form applications and many more
+# to add in the future.
+# 
+# In the case of Eden project, the bot's local guild/server is Dystopia
+# (a Discord server).
+# 
+# You can set up the local guild functionality by pasting your desired
+# guild/server's ID into the `local_guild.id`/`local_server.id` value.
+# 
+# This field is not optional as Eden needs a central guild/server to take
+# advantage of full capabilties of Eden.
+[bot.local_guild]
+# Eden's central/local guild/server's ID.
+# 
+# You can get the ID of your desired guild/server by turning on Developer
+# Mode on Discord then right click the guild/server and click/tap the `Copy Server ID`.
+# Replace `<insert me>` text with the ID you copied.
+id = "<insert me>"
+
+# The default presence of the bot.
+# 
+# Please refer to the documentation on how to manually configure
+# presences at: https://discord.com/developers/docs/topics/gateway-events#update-presence-gateway-presence-update-structure
+# 
+# If it is not set, it will set into a default presence
+# where no much activity is set for the bot.
+[bot.presence]
+status = "idle"
+afk = true
+
+[[bot.presence.activities]]
+# Type 0 means playing
+type = 0
+name = "with Ferris"
+# Use this if the type is 1 only
+# url = "..."
+
+# created_at = 0 (use Unix timestamps for this field)
+# And many more...
+
+# Parameters for sharding.
+# 
+# **Do not modify if you don't know anything about sharding in Discord API**
+# **as carelessly configuring sharding can make:**
+# - Discord ratelimit you or let your bot token be terminated
+# - Cloudflare may block you from accessing Discord
+# 
+# If you want to read about what is sharding, how it works or how should
+# you configure it, you may visit Discord's developers documentation website at:
+# https://discord.com/developers/docs/topics/gateway#sharding
+# 
+# The default configuration of sharding will be a single shard configuration
+# with an ID of 0 and size of 1 which is sufficient for small bots.
+[bot.sharding]
+# Possible variants:
+# - 
+#     type = "single"
+#     # Assigned id for a single shard/instance
+#     id = 0
+#     
+#     # Total amount of shards needed to be utilized for the bot.
+#     total = 1
+# - 
+#     type = "range"
+#     # Minimum ID that needs to be connected per instance.
+#     start = 123
+#     
+#     # Maximum ID that needs to be connected per instance.
+#     end = 3
+#     
+#     # Total amount of shards needed to be utilized for the bot.
+#     total = 5
+
+[database]
+# Maximum amount of time to spend waiting for the database
+# to successfully establish connection.
+# 
+# Eden will reject any database related transactions if it exceeds
+# the maximum amount of time waiting to successfully connect to
+# the database.
+# 
+# The default is `15` seconds, if not set.
+connect_timeout = "15s"
+
+# Maximum idle duration for individual pooled connections.
+# 
+# Any connection remains idle longer than the configured
+# will be closed.
+# 
+# The default is `10` minutes, if not set.
+idle_timeout = "10m"
+
+# Maximum amount of connections for Eden to maintain it
+# most of the time.
+# 
+# The default is `10` connections, if not set.
+max_connections = 10
+
+# Minimum amount of connections for Eden to maintain it
+# at all times.
+# 
+# The minimum connections should not exceed to the maximum
+# amount of comments (you may refer to max_connections, if you're
+# unsure about its default value). However, the set value will be
+# capped to `max_connections`.
+# 
+# The default is `0` connections, if not set.
+min_connections = 0
+
+# Maximum period of time that every transaction in the database
+# must be performed before it will cancel the transaction if it
+# exceeds the threshold.
+# 
+# The default is `15` seconds, if not set.
+query_timeout = "15s"
+
+# Connection URL to connect to the Postgres database.
+# 
+# You may want to refer to https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
+# for guide on how to setup connection URL or string to connect to the database.
+# 
+# If your cloud provider provides connection URL/string to connect
+# to the Postgres database, you should place this value here.
+url = "postgres://postgres@localhost/eden"
+
+[logging]
+# Logging style to display logs in a certain style.
+# 
+# There are three style to choose:
+# - `compact` - compacts logs but it is readable enough
+# - `pretty` - makes the entire logs pretty
+# - `json` - serializes logs into JSON data
+# 
+# The default value is `compact`, if not set.
+style = "compact"
+
+# This property filters spans and events based on the
+# set of directives.
+# 
+# This value may be overriden with `RUST_LOG` if `RUST_LOG` is set
+# and Eden is built in development mode.
+# 
+# You may refer on how directives work and parse by going to:
+# https://docs.rs/tracing-subscriber/0.3.18/tracing_subscriber/filter/struct.EnvFilter.html
+# 
+# The default value is a blank string, if not set.
+# 
+# The default value will filter only events and spans that
+# have `info` level.
+targets = "info"
+
+[worker]
+# Assigned queue worker ID. This field allows for the entire
+# workers to equally distribute tasks based on their worker ID
+# without any conflicts.
+# 
+# It defaults to `[0, 1]` if not set.
+id = [
+  0, 1,
+  # ...
+]
+
+# Maximum amount of tasks both recurring and queued running
+# at the same time. If one task needs to perform, it has to
+# wait until a running task before the queue filled up,
+# completes their operation.
+# 
+# It defaults to `10` if not set.
+max_running_tasks = 10
+
+# Amount of retries that will make a task give up or cancel if
+# it exceeds the limit.
+# 
+# It defaults to `3` retries if not set.
+max_task_retries = 3
+
+# Processes a specified number of queued tasks in a batch and waits
+# for all them to complete before proceeding to another batch of
+# queued tasks.
+# 
+# It defaults to `50` if not set.
+queued_tasks_per_batch = 50
+
+# The minimum duration threshold will consider running queued
+# tasks stalled and must be requeued again.
+# 
+# It defaults to `30 minutes` if not set.
+stalled_tasks_threshold = "30m"

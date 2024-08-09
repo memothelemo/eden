@@ -1,15 +1,13 @@
-use eden_bot::Settings;
-use eden_utils::build::BUILD;
+use eden_settings::Settings;
+use eden_utils::build;
 
-pub mod diagnostics;
-
-pub fn install_prerequisite_hooks() {
-    eden_utils::Suggestion::install_hooks();
-    eden_utils::Error::init();
-}
+pub mod logging;
 
 pub fn print_launch(settings: &Settings) {
     use nu_ansi_term::{Color, Style};
+    if eden_utils::build::PROFILE != "release" {
+        return;
+    }
 
     let ascii_art = r"
 d88888b d8888b. d88888b d8b   db 
@@ -23,18 +21,15 @@ Y88888P Y8888D' Y88888P VP   V8P
     let header = Style::new().bold();
     let ascii_art = Style::new().fg(Color::Green).paint(ascii_art);
 
-    let enabled_color = Style::new().fg(Color::Green);
-    let disabled_color = Style::new().fg(Color::Red);
-
     eprintln!("{ascii_art}");
     eprintln!(
         "{}:\t{} ({})",
         header.paint("Version"),
         env!("CARGO_PKG_VERSION"),
-        BUILD.commit_branch
+        build::COMMIT_BRANCH,
     );
-    eprintln!("{}:\t{}", header.paint("Commit hash"), BUILD.commit_hash);
-    eprintln!("{}:\t{}", header.paint("Commit date"), BUILD.commit_date);
+    eprintln!("{}:\t{}", header.paint("Commit hash"), build::COMMIT_HASH);
+    eprintln!("{}:\t{}", header.paint("Commit date"), &*build::COMMIT_DATE);
     eprintln!();
 
     if let Some(path) = settings.path() {
@@ -42,15 +37,7 @@ Y88888P Y8888D' Y88888P VP   V8P
     } else {
         eprintln!("{}:\t<none>", header.paint("Settings file"));
     }
-    eprintln!(
-        "{}:\t{}",
-        header.paint("Caching"),
-        match settings.bot().http().use_cache() {
-            true => enabled_color.paint("enabled"),
-            false => disabled_color.paint("disabled"),
-        }
-    );
-    eprintln!("{}:\t{}", header.paint("Workers"), settings.workers());
+    eprintln!("{}:\t{}", header.paint("Threads"), settings.threads);
 
     eprintln!();
 }

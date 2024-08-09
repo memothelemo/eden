@@ -1,0 +1,17 @@
+[package]
+name = "xtask"
+description = "Development tasks for Eden project"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+eden-settings.workspace = true
+eden-utils.workspace = true
+
+clap.workspace = true
+
+[lints]
+workspace = true

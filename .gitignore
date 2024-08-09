@@ -6,5 +6,8 @@ eden.toml
 eden.*.toml
 !eden.example.toml
 
+# Rust nightly crash files
+rustc-ice-*
+
 # Local environment files
 .env

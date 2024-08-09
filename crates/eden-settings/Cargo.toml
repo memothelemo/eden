@@ -1,0 +1,25 @@
+[package]
+name = "eden-settings"
+description = "Settings crate for the entire Eden project"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+eden-tasks.workspace = true
+eden-utils.workspace = true
+
+config = { version = "0.14.0", features = ["convert-case", "preserve_order", "toml"], default-features = false }
+doku.workspace = true
+num_cpus = "1.16.0"
+serde.workspace = true
+serde_with.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+twilight-model.workspace = true
+typed-builder.workspace = true
+
+[lints]
+workspace = true
