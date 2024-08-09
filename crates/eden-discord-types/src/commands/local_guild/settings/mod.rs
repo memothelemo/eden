@@ -1,7 +1,10 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 mod payer;
+mod user;
+
 pub use self::payer::*;
+pub use self::user::*;
 
 #[derive(Debug, CreateCommand, CommandModel)]
 #[command(
@@ -12,4 +15,6 @@ pub use self::payer::*;
 pub enum SettingsCommand {
     #[command(name = "payer")]
     Payer(PayerSettingsCommand),
+    #[command(name = "user")]
+    User(UserSettingsCommand),
 }

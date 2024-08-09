@@ -1,8 +1,8 @@
-#![feature(new_uninit)]
-
+#![feature(let_chains, new_uninit)]
 mod context;
 mod events;
 mod flags;
+mod interactions;
 mod local_guild;
 mod suggestions;
 #[cfg(test)]
@@ -17,6 +17,7 @@ pub use self::context::{Bot, BotRef};
 
 use self::errors::StartBotError;
 use eden_settings::Settings;
+use eden_tasks::Scheduled;
 use eden_utils::{error::exts::*, shutdown::ShutdownMode, Result};
 use std::sync::Arc;
 use std::time::Duration;
@@ -53,8 +54,21 @@ pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
             return result;
         }
 
-        eden_utils::shutdown::graceful().await;
+        // register commands
+        if let Err(error) = crate::interactions::commands::register(&bot).await {
+            warn!(error = %error.anonymize(), "failed to register Eden commands. scheduling to register commands later");
 
+            let result = bot
+                .queue
+                .schedule(tasks::RegisterCommands, Scheduled::in_minutes(5))
+                .await;
+
+            if let Err(error) = result {
+                warn!(error = %error.anonymize(), "failed to schedule to register commands for later");
+            }
+        }
+
+        eden_utils::shutdown::graceful().await;
         bot.shard_manager.shutdown_all();
         bot.shard_manager
             .wait_for_all_closed(|remaining, total| {

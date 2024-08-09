@@ -1,4 +1,4 @@
-use twilight_model::guild::{Guild, Member, Permissions, Role};
+use twilight_model::guild::{Guild, Permissions, Role};
 use twilight_model::id::marker::RoleMarker;
 use twilight_model::id::Id;
 
@@ -11,11 +11,10 @@ pub fn get_everyone_role(guild: &Guild) -> Option<&Role> {
 
 /// Gets the member's roles (ID only) with their role's permissions.
 pub fn get_member_role_perms(
-    member: &Member,
+    member_roles: &[Id<RoleMarker>],
     guild_roles: &[Role],
 ) -> Vec<(Id<RoleMarker>, Permissions)> {
-    member
-        .roles
+    member_roles
         .iter()
         .map(|role_id| {
             let permissions = guild_roles

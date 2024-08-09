@@ -1,8 +1,8 @@
 use eden_tasks::prelude::*;
-use eden_utils::Result;
+use eden_utils::{error::exts::ResultExt, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::BotRef;
+use crate::{errors::RegisterCommandsError, BotRef};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RegisterCommands;
@@ -11,7 +11,12 @@ pub struct RegisterCommands;
 impl Task for RegisterCommands {
     type State = BotRef;
 
-    async fn perform(&self, _ctx: &TaskRunContext, _state: Self::State) -> Result<TaskResult> {
+    async fn perform(&self, _ctx: &TaskRunContext, bot: Self::State) -> Result<TaskResult> {
+        let bot = bot.get();
+        crate::interactions::commands::register(&bot)
+            .await
+            .change_context(RegisterCommandsError)?;
+
         Ok(TaskResult::Completed)
     }
 

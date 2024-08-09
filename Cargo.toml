@@ -57,6 +57,7 @@ tracing = { version = "0.1.40", features = ["log"] }
 tracing-error = "0.2.0"
 
 # twilight crates
+twilight-http = { version = "0.15.4", default-features = false, features = ["rustls-native-roots", "decompression"] }
 twilight-model = "0.15.4"
 twilight-interactions = "0.15.2"
 

@@ -5,6 +5,10 @@ use thiserror::Error;
 pub struct StartBotError;
 
 #[derive(Debug, Error)]
+#[error("could not update local guild admins")]
+pub struct UpdateLocalGuildAdminsError;
+
+#[derive(Debug, Error)]
 #[error("could not initialize local guild")]
 pub struct SetupLocalGuildError;
 
@@ -16,11 +20,16 @@ pub struct SendWelcomeMessageError;
 #[error("failed to perform HTTP request to Discord")]
 pub struct RequestHttpError;
 
+#[derive(Debug, Error)]
+#[error("could not register commands")]
+pub struct RegisterCommandsError;
+
 pub mod tags {
     use eden_utils::Error;
 
     pub fn install_hook() {
         RequestHttpTag::install_hook();
+        crate::interactions::tags::install_hook();
     }
 
     pub struct RequestHttpTag {

@@ -59,5 +59,6 @@ pub fn install_hooks() {
     use eden_utils::Error;
 
     Error::init();
+    eden_bot::errors::tags::install_hook();
     eden_tasks::error::tags::install_hook();
 }

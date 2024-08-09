@@ -12,32 +12,36 @@ use crate::Bot;
 
 /// Attempts to find sendable channels for the bot to send a message with.
 pub fn find_sendable_guild_text_channel(bot: &Bot, guild: &Guild) -> Option<Id<ChannelMarker>> {
-    let Some(bot_id) = bot.application_id() else {
-        panic!("tried to access bot's application id while the bot is not ready");
-    };
-    let bot_id = bot_id.cast::<UserMarker>();
+    let bot_id = bot.application_id().cast::<UserMarker>();
 
     // Discord should provide member info for the bot.
     let member = guild.members.iter().find(|v| v.user.id == bot_id.cast())?;
 
-    let roles = crate::util::get_member_role_perms(member, &guild.roles);
+    let roles = crate::util::get_member_role_perms(&member.roles, &guild.roles);
     let everyone_role = crate::util::get_everyone_role(&guild)
         .map(|v| v.permissions)
         .unwrap_or_else(Permissions::empty);
 
     let calculator = PermissionCalculator::new(guild.id, bot_id, everyone_role, &roles);
 
-    let mut sendable_channel = guild.channels.iter().filter(|channel| {
-        let overwrites = channel.permission_overwrites.clone().unwrap_or_default();
-        let permissions = calculator.clone().in_channel(channel.kind, &overwrites);
+    let mut sendable_channels = guild
+        .channels
+        .iter()
+        .filter(|channel| {
+            let overwrites = channel.permission_overwrites.clone().unwrap_or_default();
+            let permissions = calculator.clone().in_channel(channel.kind, &overwrites);
 
-        // we do not want the bot to send something in nsfw channel
-        let is_nsfw = channel.nsfw.unwrap_or_default();
-        let can_bot_send_message_here = permissions.contains(Permissions::SEND_MESSAGES);
-        let is_text_channel = channel.kind == ChannelType::GuildText;
-        can_bot_send_message_here && is_text_channel && !is_nsfw
-    });
-    sendable_channel.next().map(|v| v.id)
+            // we do not want the bot to send something in nsfw channel
+            let is_nsfw = channel.nsfw.unwrap_or_default();
+            let can_bot_send_message_here = permissions.contains(Permissions::SEND_MESSAGES);
+            let is_text_channel = channel.kind == ChannelType::GuildText;
+            can_bot_send_message_here && is_text_channel && !is_nsfw
+        })
+        .collect::<Vec<_>>();
+
+    // sort channels by their date
+    sendable_channels.sort_by(|a, b| a.id.cmp(&b.id));
+    sendable_channels.into_iter().next().map(|v| v.id)
 }
 
 #[allow(clippy::expect_used)]

@@ -5,3 +5,4 @@ mod identity;
 mod payer;
 mod payer_application;
 mod payment;
+mod user;

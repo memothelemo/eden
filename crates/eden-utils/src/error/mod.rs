@@ -203,6 +203,7 @@ impl Error {
     pub fn init() {
         use self::tags::Suggestion;
         use crate::sql::tags::{DatabaseErrorType, PostgresErrorInfo};
+        use crate::twilight::tags::DiscordHttpErrorInfo;
 
         use error_stack::fmt::{Charset, ColorMode};
 
@@ -212,6 +213,7 @@ impl Error {
         Suggestion::install_hook();
         DatabaseErrorType::install_hook();
         PostgresErrorInfo::install_hook();
+        DiscordHttpErrorInfo::install_hook();
     }
 }
 

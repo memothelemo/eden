@@ -11,7 +11,7 @@ use crate::forms::{
     InsertPayerForm, InsertPaymentForm,
 };
 use crate::payment::{PaymentData, PaymentMethod};
-use crate::types::{Admin, Bill, Identity, Payer, PayerApplication, Payment};
+use crate::types::{Admin, Bill, Identity, Payer, PayerApplication, Payment, User};
 
 pub async fn generate_payer_application(conn: &mut sqlx::PgConnection) -> Result<PayerApplication> {
     let user_id = Id::new(12345678);
@@ -102,6 +102,10 @@ pub async fn generate_payer(conn: &mut sqlx::PgConnection) -> Result<Payer> {
         .build();
 
     Payer::insert(conn, form).await.anonymize_error()
+}
+
+pub async fn generate_user(conn: &mut sqlx::PgConnection) -> Result<User> {
+    User::insert(conn, Id::new(2345678)).await.anonymize_error()
 }
 
 pub async fn generate_admin(conn: &mut sqlx::PgConnection) -> Result<Admin> {

@@ -40,7 +40,7 @@ impl Deref for GuildSettingsRow {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum GuildSettingsVersion {
     #[default]
@@ -48,9 +48,12 @@ pub enum GuildSettingsVersion {
 }
 
 // These fields may be changed in the future.
-#[derive(Debug, Deserialize, Serialize, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, TypedBuilder, PartialEq, Eq)]
 #[serde(default)]
 pub struct GuildSettings {
+    // memo: Please be considerate and wrap with Sensitive if you want to have
+    //       an option that is considered sensitive because this will logged and
+    //       sent to users if their developer mode option is turned on
     #[serde(rename = "_v")]
     #[builder(default)]
     pub version: GuildSettingsVersion,
@@ -67,7 +70,7 @@ impl Default for GuildSettings {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, TypedBuilder)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, TypedBuilder)]
 #[serde(default)]
 pub struct PayerGuildSettings {
     #[builder(default = false)]

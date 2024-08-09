@@ -109,6 +109,7 @@ impl ShardRunner {
                 ShardAction::NewEvent(event) => event,
             };
 
+            let bot = self.bot.get();
             if matches!(event.kind(), EventType::Ready | EventType::Resumed) {
                 debug!("shard {} is ready", self.id);
                 if let Err(error) = self.observer.send(ShardNotification::Connected(self.id)) {
@@ -117,11 +118,15 @@ impl ShardRunner {
                 // update their presence while it is ready
                 self.update_presence().await;
             }
+
+            if let Event::Ready(data) = &event {
+                bot.override_application_id(data.application.id);
+            }
             trace!("received event {:?}", event.kind());
 
             let span = Span::current();
             let ctx = EventContext {
-                bot: self.bot.get(),
+                bot,
                 latency: self.shard.latency().clone(),
                 shard: self.handle.clone(),
             };

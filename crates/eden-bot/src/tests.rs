@@ -24,6 +24,7 @@ pub fn generate_fake_settings() -> Settings {
                 .local_guild(
                     LocalGuild::builder()
                         .id(Id::new(273534239310479360))
+                        .alert_channel_id(Id::new(273534239310479360))
                         .build(),
                 )
                 .token("a test token")

@@ -10,6 +10,7 @@ use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_http::client::InteractionClient;
 use twilight_model::id::{marker::ApplicationMarker, Id};
 
+use crate::interactions::InMemoryCommandState;
 use crate::shard::ShardManager;
 
 // involves database functionality for Bot struct.
@@ -21,6 +22,7 @@ pub struct BotInner {
     pub cache: Arc<InMemoryCache>,
     pub http: Arc<twilight_http::Client>,
     pub queue: BotQueue,
+    pub command_state: Arc<InMemoryCommandState>,
     pub shard_manager: Arc<ShardManager>,
     pub settings: Arc<Settings>,
 
@@ -93,6 +95,7 @@ impl Bot {
                 cache,
                 is_local_guild_loaded: AtomicBool::new(false),
                 http,
+                command_state: InMemoryCommandState::new(bot_weak.clone()),
                 queue,
                 shard_manager,
                 settings,
@@ -105,7 +108,17 @@ impl Bot {
 
     /// Gets the resolved application ID if it is loaded.
     #[must_use]
-    pub fn application_id(&self) -> Option<Id<ApplicationMarker>> {
+    pub fn application_id(&self) -> Id<ApplicationMarker> {
+        if let Some(id) = self.checked_application_id() {
+            id
+        } else {
+            panic!("tried to access bot's application id while the bot is not ready");
+        }
+    }
+
+    /// Gets the resolved application ID if it is loaded.
+    #[must_use]
+    pub fn checked_application_id(&self) -> Option<Id<ApplicationMarker>> {
         let value = self.0.application_id.load(Ordering::Relaxed);
         Id::<ApplicationMarker>::new_checked(value)
     }
@@ -122,7 +135,7 @@ impl Bot {
 
     #[must_use]
     pub fn interaction(&self) -> InteractionClient<'_> {
-        let Some(application_id) = self.application_id() else {
+        let Some(application_id) = self.checked_application_id() else {
             panic!("tried to call bot.interaction while the bot is not ready");
         };
         self.0.http.interaction(application_id)
@@ -216,10 +229,10 @@ mod tests {
     async fn test_override_application_id() {
         let settings = crate::tests::generate_fake_settings();
         let bot = Bot::new(Arc::new(settings));
-        assert_eq!(bot.application_id(), None);
+        assert_eq!(bot.checked_application_id(), None);
 
         let new_id = Id::new(273534239310479360);
         bot.override_application_id(new_id);
-        assert_eq!(bot.application_id(), Some(new_id));
+        assert_eq!(bot.checked_application_id(), Some(new_id));
     }
 }

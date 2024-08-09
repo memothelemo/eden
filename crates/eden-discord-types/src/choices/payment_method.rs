@@ -1,11 +1,13 @@
 use eden_utils::aliases;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use twilight_interactions::command::{CommandOption, CreateOption};
 use twilight_model::application::command::{
     CommandOptionChoice, CommandOptionChoiceValue, CommandOptionType,
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum PaymentMethodOption {
     Mynt,
     PayPal,

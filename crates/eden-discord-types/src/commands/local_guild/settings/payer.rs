@@ -2,7 +2,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 #[derive(Debug, CreateCommand, CommandModel)]
 #[command(
-    name = "settings",
+    name = "payer",
     desc = "Commands to manage settings for monthly contributors",
     dm_permission = false
 )]

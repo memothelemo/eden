@@ -8,7 +8,7 @@ use twilight_model::id::Id;
 use crate::types::{GuildSettings, GuildSettingsRow};
 
 impl GuildSettings {
-    pub async fn from_guild(
+    pub async fn upsert(
         conn: &mut sqlx::PgConnection,
         id: Id<GuildMarker>,
     ) -> Result<GuildSettingsRow, QueryError> {
@@ -81,7 +81,7 @@ mod tests {
         let guild_id = Id::<GuildMarker>::new(12345678);
 
         // Should insert if it doesn't exists
-        GuildSettings::from_guild(&mut conn, guild_id)
+        GuildSettings::upsert(&mut conn, guild_id)
             .await
             .anonymize_error()?;
 
@@ -110,14 +110,14 @@ mod tests {
         assert!(!is_exists(&mut conn, guild_id).await?);
 
         // Should insert if it doesn't exists
-        GuildSettings::from_guild(&mut conn, guild_id)
+        GuildSettings::upsert(&mut conn, guild_id)
             .await
             .anonymize_error()?;
 
         assert!(is_exists(&mut conn, guild_id).await?);
 
         // Should get the row if it does exists
-        GuildSettings::from_guild(&mut conn, guild_id)
+        GuildSettings::upsert(&mut conn, guild_id)
             .await
             .anonymize_error()?;
 

@@ -85,8 +85,7 @@ impl Payment {
             .attach_printable("could not serialize payment data to update payment")?;
 
         sqlx::query_as::<_, Self>(
-            r"
-            UPDATE payments
+            r"UPDATE payments
             SET data = $1
             WHERE id = $2
             RETURNING *",

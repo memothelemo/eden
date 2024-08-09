@@ -23,6 +23,7 @@ impl<'a> CatchUnwindTaskFuture<'a> {
 impl<'a> Future for CatchUnwindTaskFuture<'a> {
     type Output = eden_utils::Result<TaskResult, TaskError>;
 
+    #[track_caller]
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,

@@ -22,7 +22,7 @@ use crate::errors::RequestHttpError;
 /// bot.http.create_message(channel.id)
 ///     .content("Hello world!")
 ///     .expect("Oops!")
-///     .map(|v| v.into_typed_error().anonymize_error())
+///     .map(|v| v.into_eden_error().anonymize_error())
 ///     .and_then(|v| v.model().map(|v| v.into_typed_error().anonymize_error()))
 ///     .await
 /// ```
@@ -61,7 +61,7 @@ pub async fn request_for_list<
     trace!("fetching request for list");
     let list = client
         .request::<Vec<M>>(request)
-        .map(|v| v.into_typed_error().anonymize_error())
+        .map(|v| v.into_eden_error().anonymize_error())
         .and_then(|v| v.model().map(|v| v.into_typed_error().anonymize_error()))
         .await
         .change_context(RequestHttpError)
@@ -98,7 +98,7 @@ pub async fn request_for_model<
     trace!("fetching request for model");
     let response = client
         .request::<M>(request)
-        .map(|v| v.into_typed_error().anonymize_error())
+        .map(|v| v.into_eden_error().anonymize_error())
         .and_then(|v| v.model().map(|v| v.into_typed_error().anonymize_error()))
         .await
         .change_context(RequestHttpError)

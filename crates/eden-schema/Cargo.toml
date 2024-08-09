@@ -16,6 +16,7 @@ serde_json.workspace = true
 sqlx.workspace = true
 rust_decimal.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 twilight-model.workspace = true
 typed-builder.workspace = true
 uuid.workspace = true

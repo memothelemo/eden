@@ -15,10 +15,24 @@ pub use self::application::*;
 pub enum PayerCommand {
     #[command(name = "app")]
     Application(PayerApplicationCommand),
+    #[command(name = "pay_bill")]
+    PayBill(PayerPayBill),
     #[command(name = "register")]
     Register(PayerRegister),
     #[command(name = "test")]
     Test(PayerTest),
+}
+
+#[derive(Debug, CreateCommand, CommandModel)]
+#[command(
+    name = "pay_bill",
+    desc = "Allows you to pay bills to the server",
+    dm_permission = false
+)]
+pub struct PayerPayBill {
+    /// Your preferred payment method
+    #[allow(unused)]
+    pub method: PaymentMethodOption,
 }
 
 #[derive(Debug, CreateCommand, CommandModel)]

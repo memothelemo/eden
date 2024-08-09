@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use std::num::NonZeroU64;
 use std::time::Duration;
 use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
-use twilight_model::id::marker::GuildMarker;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 use twilight_model::id::Id;
 use typed_builder::TypedBuilder;
 
@@ -95,6 +95,11 @@ pub struct LocalGuild {
     /// Replace `<insert me>` text with the ID you copied.
     #[doku(as = "String", example = "<insert me>")]
     pub id: Id<GuildMarker>,
+
+    // TODO: Document this field
+    /// Alert admin channel.
+    #[doku(as = "String", example = "<insert me>")]
+    pub alert_channel_id: Id<ChannelMarker>,
 }
 
 // TODO: allow Eden to do some shard queueing
