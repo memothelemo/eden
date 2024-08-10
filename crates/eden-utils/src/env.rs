@@ -9,6 +9,10 @@ use crate::Result;
 #[error("Could not load environment variable")]
 pub struct LoadEnvError;
 
+pub fn init() {
+    dotenvy::dotenv().ok();
+}
+
 #[track_caller]
 pub fn var(key: &'static str) -> Result<String, LoadEnvError> {
     dotenvy::var(key).map_err(|v| (v, key).into_eden_error())

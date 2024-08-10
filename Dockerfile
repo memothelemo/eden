@@ -4,7 +4,6 @@ ARG BUILD_DIR=/usr/build/eden
 
 ARG COMMIT_HASH
 ARG COMMIT_BRANCH
-ARG COMMIT_DATE
 
 # We don't need to specify the Rust version since we're using nightly anyways
 FROM lukemathwalker/cargo-chef:0.1.67-rust-bullseye AS chef
@@ -12,7 +11,10 @@ ARG BUILD_DIR
 WORKDIR ${BUILD_DIR}
 
 # Required dependencies for compilation
-RUN apt update && apt install -y git cmake
+RUN apt-get update && \
+    apt-get install -y \
+        --no-install-recommends \
+        cmake
 
 #################################################################################
 # So we don't have to download Rust nightly components all the time
@@ -35,7 +37,6 @@ ARG RUST_BUILD_MODE
 
 ARG COMMIT_HASH
 ARG COMMIT_BRANCH
-ARG COMMIT_DATE
 
 ENV VERGEN_GIT_SHA=${COMMIT_HASH} VERGEN_GIT_BRANCH=${COMMIT_BRANCH}
 
