@@ -3,12 +3,9 @@ use eden_utils::Result;
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use super::{CommandContext, RunCommand};
-use crate::{
-    interactions::{
-        record_local_guild_ctx, stateful_commands, LocalGuildContext, StatefulCommandType,
-    },
-    util::http::request_for_model,
-};
+use crate::interactions::state::{commands::PayerPayBillState, StatefulCommand};
+use crate::interactions::{record_local_guild_ctx, LocalGuildContext};
+use crate::util::http::request_for_model;
 
 const PROMPT_MYNT_MESSAGE: &str = "**To let us know that you're paying with us, please send your {MYNT_ALIAS} screenshot of transfer.**";
 const PROMPT_PAYPAL_MESSAGE: &str = "**To let us know that you're paying with us, please send your PayPal screenshot of transfer.**";
@@ -44,11 +41,9 @@ impl RunCommand for PayerPayBill {
 
         request_for_model(&ctx.bot.http, result).await?;
 
-        let state = StatefulCommandType::PayerPayBill(stateful_commands::PayerPayBill::new(
-            dm_channel_id,
-            self.method,
-        ));
-        ctx.bot.command_state.insert(ctx.interaction.id, state);
+        let state = PayerPayBillState::new(dm_channel_id, self.method);
+        let command = StatefulCommand::PayerPayBill(state);
+        ctx.bot.command_state.insert(ctx.interaction.id, command);
 
         let data = InteractionResponseDataBuilder::new()
             .content("**Please proceed to DMs for instructions.**")

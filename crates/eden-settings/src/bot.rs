@@ -1,4 +1,5 @@
 use doku::Document;
+use eden_tasks::prelude::TimeDelta;
 use eden_utils::error::exts::ErrorExt;
 use eden_utils::types::{ProtectedString, Sensitive};
 use eden_utils::{Error, ErrorCategory, Result};
@@ -17,6 +18,12 @@ use crate::SettingsLoadError;
 
 #[derive(Debug, Deserialize, Document, Serialize, TypedBuilder)]
 pub struct Bot {
+    /// Parameters for configuring what Eden should behave when
+    /// dealing with its commands to any users.
+    #[builder(default)]
+    #[serde(default)]
+    pub commands: Commands,
+
     /// Parameters for configuring what Eden should behave when
     /// it interacts with Discord's REST/HTTP API.
     ///
@@ -275,6 +282,29 @@ impl Default for Http {
             proxy: None,
             proxy_use_http: true,
             timeout: Duration::from_secs(10),
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize, Document, Serialize, TypedBuilder)]
+#[serde(default)]
+pub struct Commands {
+    /// How long will commands that requires user interaction in steps
+    /// will abort after the user is not interacted to the bot with the
+    /// command in a certain period of time.
+    ///
+    /// It defaults to 15 minutes, if not set.
+    #[builder(default = TimeDelta::minutes(60 * 15))]
+    #[doku(as = "String", example = "15m")]
+    #[serde_as(as = "eden_utils::serial::AsHumanDuration")]
+    pub inactivity_timeout: TimeDelta,
+}
+
+impl Default for Commands {
+    fn default() -> Self {
+        Self {
+            inactivity_timeout: TimeDelta::minutes(60 * 15),
         }
     }
 }

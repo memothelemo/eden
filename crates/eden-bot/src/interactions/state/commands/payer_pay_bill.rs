@@ -1,6 +1,9 @@
-use crate::interactions::{StatefulCommand, StatefulCommandResult, StatefulCommandTrigger};
+use crate::interactions::state::{
+    AnyStatefulCommand, CommandTriggerAction, StatefulCommandTrigger,
+};
 use crate::util::http::request_for_model;
 use crate::{tasks, Bot};
+
 use eden_discord_types::choices::PaymentMethodOption;
 use eden_tasks::Scheduled;
 use eden_utils::Result;
@@ -12,14 +15,14 @@ use twilight_model::id::marker::{ChannelMarker, MessageMarker};
 use twilight_model::id::Id;
 
 #[derive(Debug)]
-pub struct PayerPayBill {
+pub struct PayerPayBillState {
     pub busy: AtomicBool,
     pub dm_channel_id: Id<ChannelMarker>,
     pub method: PaymentMethodOption,
     pub last_user_message_id: Mutex<Option<Id<MessageMarker>>>,
 }
 
-impl PayerPayBill {
+impl PayerPayBillState {
     #[must_use]
     pub fn new(dm_channel_id: Id<ChannelMarker>, method: PaymentMethodOption) -> Self {
         Self {
@@ -31,23 +34,28 @@ impl PayerPayBill {
     }
 }
 
-#[allow(clippy::unwrap_used)]
-impl StatefulCommand for PayerPayBill {
-    #[tracing::instrument(skip(self, bot))]
+const SUCCESS: &str = "**All right!** Thank you for paying your bills and your bill will be sent to the administrators!";
+const NOT_ATTACHMENT_ERROR: &str = "**Please upload the proof of transfer image only!**";
+const UNABLE_TO_READ_MSG: &str =
+    "Sorry. I cannot get your message data. Please try to send it to me again.";
+
+const CANCELLED_PAYMENT_MSG: &str = "**Cancelled payment process because of inactivity. Please try running `/payer pay_bill` again in the server.**";
+
+impl AnyStatefulCommand for PayerPayBillState {
+    #[tracing::instrument(skip(bot))]
     async fn on_trigger(
         &self,
         bot: &Bot,
         trigger: StatefulCommandTrigger,
-    ) -> Result<StatefulCommandResult> {
-        let message_id = match trigger {
-            StatefulCommandTrigger::SentMessage(channel_id, message_id)
-                if channel_id == self.dm_channel_id =>
-            {
-                message_id
-            }
-            _ => return Ok(StatefulCommandResult::Ignore),
+    ) -> Result<CommandTriggerAction> {
+        let StatefulCommandTrigger::SentMessage(channel_id, message_id) = trigger else {
+            return Ok(CommandTriggerAction::Nothing);
         };
-        *self.last_user_message_id.lock().await = Some(message_id);
+
+        if channel_id != self.dm_channel_id {
+            return Ok(CommandTriggerAction::Nothing);
+        }
+        self.last_user_message_id.lock().await.replace(message_id);
 
         // Read the message perhaps :)
         let request = bot.http.message(self.dm_channel_id, message_id);
@@ -58,22 +66,20 @@ impl StatefulCommand for PayerPayBill {
                 let error = error.anonymize();
                 warn!(%error, "unable to get message data from Discord");
                 self.reply_message(bot, UNABLE_TO_READ_MSG).await?;
-                return Ok(StatefulCommandResult::Continue);
+                return Ok(CommandTriggerAction::Continue);
             }
         };
 
         // Make sure the user uploaded an attachment containing JPEG or PNG.
         let Some(attachment) = message.attachments.first() else {
             self.reply_message(bot, NOT_ATTACHMENT_ERROR).await?;
-            return Ok(StatefulCommandResult::Continue);
+            return Ok(CommandTriggerAction::Continue);
         };
 
-        if !matches!(
-            attachment.content_type.as_deref(),
-            Some("image/jpeg" | "image/png")
-        ) {
+        let content_type = attachment.content_type.as_deref();
+        if !matches!(content_type, Some("image/jpeg" | "image/png")) {
             self.reply_message(bot, NOT_ATTACHMENT_ERROR).await?;
-            return Ok(StatefulCommandResult::Continue);
+            return Ok(CommandTriggerAction::Continue);
         }
 
         let filename = PathBuf::from(&attachment.filename);
@@ -91,21 +97,21 @@ impl StatefulCommand for PayerPayBill {
             payment_image_ext: file_extension,
         };
 
+        // If it does send, relay it to the alert channel
         if let Err(error) = bot.queue.schedule(task, Scheduled::now()).await {
             let error = error.anonymize();
-            warn!(%error, "failed to schedule to alert payments to the admins");
+            warn!(%error, "failed to schedule task to alert new payment to the admins");
 
             self.reply_message(bot, UNABLE_TO_READ_MSG).await?;
-            return Ok(StatefulCommandResult::Continue);
+            return Ok(CommandTriggerAction::Continue);
         }
 
-        // If it does send, relay it to the alert channel
         self.reply_message(bot, SUCCESS).await?;
-        Ok(StatefulCommandResult::Done)
+        Ok(CommandTriggerAction::Done)
     }
 
-    #[tracing::instrument(skip(self, bot))]
-    async fn on_inactive(&self, bot: &Bot) -> Result<()> {
+    #[tracing::instrument(skip(bot))]
+    async fn on_timed_out(&self, bot: &Bot) -> Result<()> {
         let request = bot
             .http
             .create_message(self.dm_channel_id)
@@ -117,7 +123,7 @@ impl StatefulCommand for PayerPayBill {
     }
 }
 
-impl PayerPayBill {
+impl PayerPayBillState {
     #[tracing::instrument(skip_all)]
     async fn reply_message(&self, bot: &Bot, message: &str) -> Result<()> {
         let last_user_message_id = *self.last_user_message_id.lock().await;
@@ -136,10 +142,3 @@ impl PayerPayBill {
         Ok(())
     }
 }
-
-const SUCCESS: &str = "**All right!** Thank you for paying your bills and your bill will be sent to the administrators!";
-const NOT_ATTACHMENT_ERROR: &str = "**Please upload the proof of transfer image only!**";
-const UNABLE_TO_READ_MSG: &str =
-    "Sorry. I cannot get your message data. Please try to send it to me again.";
-
-const CANCELLED_PAYMENT_MSG: &str = "**Cancelled payment process because of inactivity. Please try running `/payer pay_bill` again in the server.**";

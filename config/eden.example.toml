@@ -25,6 +25,16 @@ threads = 2
 token = "<insert token here>"
 
 # Parameters for configuring what Eden should behave when
+# dealing with its commands.
+[bot.commands]
+# How long will commands that requires user interaction in steps
+# will abort after the user is not interacted to the bot with the
+# command in a certain period of time.
+# 
+# It defaults to 15 minutes, if not set.
+inactivity_timeout = "15m"
+
+# Parameters for configuring what Eden should behave when
 # it interacts with Discord's REST/HTTP API.
 # 
 # **Do not modify if you don't know anything about HTTP or how Discord HTTP API works.**

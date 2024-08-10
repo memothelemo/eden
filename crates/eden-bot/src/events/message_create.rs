@@ -1,9 +1,9 @@
 use eden_utils::Result;
-use tracing::debug;
+use tracing::trace;
 use twilight_model::channel::Message;
 
 use super::EventContext;
-use crate::interactions::StatefulCommandTrigger;
+use crate::interactions::state::StatefulCommandTrigger;
 
 #[allow(clippy::expect_used)]
 #[tracing::instrument(skip_all, fields(
@@ -19,14 +19,10 @@ pub async fn handle(ctx: &EventContext, message: Message) -> Result<()> {
         return Ok(());
     }
 
-    debug!("received human message {}", message.id);
-    ctx.bot
-        .command_state
-        .trigger_command(StatefulCommandTrigger::SentMessage(
-            message.channel_id,
-            message.id,
-        ))
-        .await;
+    trace!("received human message {}", message.id);
+
+    let trigger = StatefulCommandTrigger::SentMessage(message.channel_id, message.id);
+    ctx.bot.command_state.trigger_commands(trigger);
 
     Ok(())
 }

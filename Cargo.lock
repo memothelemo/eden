@@ -815,6 +815,7 @@ dependencies = [
  "serde",
  "sqlx",
  "strip-ansi-escapes",
+ "strum_macros",
  "thiserror",
  "tokio",
  "tokio-util",
