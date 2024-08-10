@@ -12,6 +12,7 @@ impl RunCommand for PayerApplicationPending {
     async fn run(&self, ctx: &CommandContext) -> Result<()> {
         let ctx = LocalGuildContext::from_ctx(ctx).await?;
         record_local_guild_ctx!(ctx);
+
         ctx.unimplemented_cmd()
     }
 
@@ -20,6 +21,6 @@ impl RunCommand for PayerApplicationPending {
     }
 
     fn channel_permissions(&self) -> Permissions {
-        Permissions::ADD_REACTIONS | Permissions::VIEW_CHANNEL
+        Permissions::ADD_REACTIONS | Permissions::MANAGE_MESSAGES | Permissions::VIEW_CHANNEL
     }
 }

@@ -7,6 +7,8 @@ use thiserror::Error;
 use twilight_model::{channel::message::Embed, http::interaction::InteractionResponseData};
 use twilight_util::builder::{embed::EmbedBuilder, InteractionResponseDataBuilder};
 
+pub mod local_guild;
+
 #[derive(Debug, Error)]
 #[error("command {0:?} is not implemented")]
 pub struct UnknownCommandError(pub(super) String);
