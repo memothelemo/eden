@@ -4,20 +4,20 @@ use eden_utils::Result;
 mod settings;
 
 #[derive(Debug, Args)]
-pub(super) struct GenerateCmd {
+pub struct GenerateArgs {
     #[clap(subcommand)]
-    cmd: Inner,
+    subcommand: GenerateSubcommand,
 }
 
 #[derive(Debug, Subcommand)]
-enum Inner {
+enum GenerateSubcommand {
+    /// Generates the entire documentation of settings in every
+    /// and saves it in `config/eden.example.toml`.
     Settings,
 }
 
-impl GenerateCmd {
-    pub fn run(&self) -> Result<()> {
-        match self.cmd {
-            Inner::Settings => self::settings::run(),
-        }
+pub fn run(args: &GenerateArgs) -> Result<()> {
+    match args.subcommand {
+        GenerateSubcommand::Settings => self::settings::run(),
     }
 }

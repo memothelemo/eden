@@ -22,6 +22,9 @@ pub async fn handle_event(ctx: EventContext, event: Event) {
         Event::GuildCreate(guild) => self::guild_create::handle(&ctx, guild.0).await,
         Event::InteractionCreate(data) => self::interaction::handle(&ctx, data.0).await,
         Event::MessageCreate(data) => self::message_create::handle(&ctx, data.0).await,
+        Event::MessageDelete(..) => Ok(()),
+        Event::MessageDeleteBulk(..) => Ok(()),
+        Event::MemberUpdate(..) => Ok(()),
         Event::Ready(data) => self::ready::handle(&ctx, &data).await,
         Event::Resumed => {
             debug!("successfully resumed gateway session");

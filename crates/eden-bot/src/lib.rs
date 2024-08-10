@@ -15,18 +15,23 @@ pub mod util;
 
 pub use self::context::{Bot, BotRef};
 
-use self::errors::StartBotError;
+use self::errors::{MigrateError, StartBotError};
 use eden_settings::Settings;
 use eden_tasks::Scheduled;
 use eden_utils::{error::exts::*, shutdown::ShutdownMode, Result};
-use std::sync::Arc;
 use std::time::Duration;
+use std::{sync::Arc, time::Instant};
 use tokio::sync::Mutex;
 use tracing::{debug, info, trace, warn};
 
 #[tracing::instrument(skip_all, name = "start_bot")]
 pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
     let bot = Bot::new(settings);
+    // Run migrations first before starting the bot process entirely
+    perform_database_migrations(&bot)
+        .await
+        .change_context(StartBotError)?;
+
     bot.shard_manager.start_all();
 
     let bot_tx = bot.clone();
@@ -96,6 +101,23 @@ pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
 
     bot?;
     queue?;
+
+    Ok(())
+}
+
+#[tracing::instrument(skip_all)]
+async fn perform_database_migrations(bot: &Bot) -> Result<(), MigrateError> {
+    info!("performing database migrations. this may take a while...");
+
+    let now = Instant::now();
+    eden_schema::MIGRATOR
+        .run(&bot.pool)
+        .await
+        .into_typed_error()
+        .change_context(MigrateError)?;
+
+    let elapsed = now.elapsed();
+    info!(?elapsed, "successfully performed database migrations");
 
     Ok(())
 }

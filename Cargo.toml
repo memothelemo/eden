@@ -17,6 +17,10 @@ eden-settings = { path = "crates/eden-settings" }
 eden-tasks = { path = "crates/eden-tasks" }
 eden-utils = { path = "crates/eden-utils" }
 
+# external APIs and others
+nu-ansi-term = "0.50.1"
+sentry = { version = "0.32.0", default-features = false, features = ["backtrace", "contexts", "reqwest", "tracing", "rustls"] }
+
 # types
 chrono = { version = "0.4.38", features = ["serde"] }
 dashmap = "6.0.1"
@@ -34,7 +38,7 @@ strum_macros = "0.26.4"
 thiserror = "1.0.61"
 
 # user configuration
-clap = { version = "4.5.13", features = ["derive"] }
+clap = { version = "4.5.13", features = ["derive", "env"] }
 config = { version = "0.14.0", features = ["convert-case", "preserve_order", "toml"], default-features = false }
 doku = "0.21.1"
 dotenvy = "0.15.7"

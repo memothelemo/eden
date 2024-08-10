@@ -22,6 +22,7 @@ pub struct BotInner {
     pub cache: Arc<InMemoryCache>,
     pub command_state: CommandStates,
     pub http: Arc<twilight_http::Client>,
+    pub pool: sqlx::PgPool,
     pub queue: BotQueue,
     pub shard_manager: Arc<ShardManager>,
     pub settings: Arc<Settings>,
@@ -30,7 +31,6 @@ pub struct BotInner {
     // as long as it is a valid Twilight application ID.
     application_id: AtomicU64,
     is_local_guild_loaded: AtomicBool,
-    pool: sqlx::PgPool,
 }
 
 impl Bot {

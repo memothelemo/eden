@@ -21,7 +21,7 @@ impl RunCommand for PayerCommand {
             Self::Application(cmd) => cmd.guild_permissions(),
             Self::PayBill(cmd) => cmd.guild_permissions(),
             Self::Register(cmd) => cmd.guild_permissions(),
-            Self::Test(..) => todo!(),
+            Self::Test(..) => Permissions::empty(),
         }
     }
 
@@ -30,7 +30,7 @@ impl RunCommand for PayerCommand {
             Self::Application(cmd) => cmd.user_permissions(),
             Self::PayBill(cmd) => cmd.user_permissions(),
             Self::Register(cmd) => cmd.user_permissions(),
-            Self::Test(..) => todo!(),
+            Self::Test(..) => Permissions::empty(),
         }
     }
 
@@ -39,7 +39,7 @@ impl RunCommand for PayerCommand {
             Self::Application(cmd) => cmd.channel_permissions(),
             Self::PayBill(cmd) => cmd.channel_permissions(),
             Self::Register(cmd) => cmd.channel_permissions(),
-            Self::Test(..) => todo!(),
+            Self::Test(..) => Permissions::empty(),
         }
     }
 }

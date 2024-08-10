@@ -220,6 +220,24 @@ style = "compact"
 # The default value will filter only events and spans that
 # have `info` level.
 targets = "info"
+# Optional
+
+[sentry]
+dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
+environment = "release"
+
+# This property filters spans and events based on the
+# set of directives.
+# 
+# You may refer on how directives work and parse by going to:
+# https://docs.rs/tracing-subscriber/0.3.18/tracing_subscriber/filter/struct.EnvFilter.html
+# 
+# The default value is a blank string, if not set.
+# 
+# The default value will filter only events and spans that
+# have `info` level.
+targets = "info"
+traces_sample_rate = 1
 
 [worker]
 # Assigned queue worker ID. This field allows for the entire

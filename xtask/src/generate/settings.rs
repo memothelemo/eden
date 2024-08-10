@@ -1,8 +1,6 @@
 use eden_settings::Settings;
-use eden_utils::{
-    error::exts::{AnonymizeErrorInto, AnonymizedResultExt},
-    Result,
-};
+use eden_utils::error::exts::{AnonymizeErrorInto, AnonymizedResultExt};
+use eden_utils::Result;
 
 const EXAMPLE_SETTINGS_FILE: &str =
     concat!(env!("CARGO_WORKSPACE_DIR"), "config/eden.example.toml");

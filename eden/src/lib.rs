@@ -2,6 +2,7 @@ use eden_settings::Settings;
 use eden_utils::build;
 
 pub mod logging;
+pub mod sentry;
 
 pub fn print_launch(settings: &Settings) {
     use nu_ansi_term::{Color, Style};
@@ -29,15 +30,42 @@ Y88888P Y8888D' Y88888P VP   V8P
         build::COMMIT_BRANCH,
     );
     eprintln!("{}:\t{}", header.paint("Commit hash"), build::COMMIT_HASH);
-    eprintln!("{}:\t{}", header.paint("Commit date"), &*build::COMMIT_DATE);
     eprintln!();
 
+    eprintln!(
+        "{}:\t\t{}",
+        header.paint("Cache"),
+        enabled_or_disabled(settings.bot.http.use_cache),
+    );
     if let Some(path) = settings.path() {
         eprintln!("{}:\t{}", header.paint("Settings file"), path.display());
     } else {
         eprintln!("{}:\t<none>", header.paint("Settings file"));
     }
+    eprintln!(
+        "{}:\t{}",
+        header.paint("Shard(s)"),
+        settings.bot.sharding.size(),
+    );
     eprintln!("{}:\t{}", header.paint("Threads"), settings.threads);
 
+    if let Some(sentry) = settings.sentry.as_ref() {
+        eprintln!();
+        eprintln!("{}:\t\tenabled", header.paint("Sentry"),);
+        eprintln!(
+            "{}:\t\t{:?}",
+            header.paint("Sentry env."),
+            sentry.environment
+        );
+    }
+
     eprintln!();
+}
+
+fn enabled_or_disabled(value: bool) -> &'static str {
+    if value {
+        "enabled"
+    } else {
+        "disabled"
+    }
 }

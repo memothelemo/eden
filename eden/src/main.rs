@@ -14,10 +14,10 @@ async fn bootstrap(settings: Settings) -> Result<()> {
 
 fn start() -> Result<()> {
     let settings = Settings::from_env()?;
-
-    eden::print_launch(&settings);
     eden::logging::init(&settings)?;
+    eden::print_launch(&settings);
 
+    let _sentry = eden::sentry::init(&settings);
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(settings.threads)
