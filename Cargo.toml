@@ -30,6 +30,7 @@ typed-builder = "0.18.2"
 
 # macros
 paste = "1.0.15"
+strum_macros = "0.26.4"
 thiserror = "1.0.61"
 
 # user configuration

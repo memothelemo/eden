@@ -20,6 +20,7 @@ fancy-duration.workspace = true
 futures.workspace = true
 serde.workspace = true
 sqlx.workspace = true
+strum_macros.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true

@@ -10,7 +10,7 @@ use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_http::client::InteractionClient;
 use twilight_model::id::{marker::ApplicationMarker, Id};
 
-use crate::interactions::InMemoryCommandState;
+use crate::interactions::state::CommandStates;
 use crate::shard::ShardManager;
 
 // involves database functionality for Bot struct.
@@ -20,9 +20,9 @@ mod util;
 
 pub struct BotInner {
     pub cache: Arc<InMemoryCache>,
+    pub command_state: CommandStates,
     pub http: Arc<twilight_http::Client>,
     pub queue: BotQueue,
-    pub command_state: Arc<InMemoryCommandState>,
     pub shard_manager: Arc<ShardManager>,
     pub settings: Arc<Settings>,
 
@@ -82,6 +82,7 @@ impl Bot {
 
         let inner = Arc::<BotInner>::new_cyclic(move |bot_weak| {
             let bot_weak = BotRef(bot_weak.clone());
+            let command_state = CommandStates::new(bot_weak.clone(), &settings);
             let queue = crate::tasks::register_all_tasks(QueueWorker::new(
                 settings.worker.id,
                 pool.clone(),
@@ -95,7 +96,7 @@ impl Bot {
                 cache,
                 is_local_guild_loaded: AtomicBool::new(false),
                 http,
-                command_state: InMemoryCommandState::new(bot_weak.clone()),
+                command_state,
                 queue,
                 shard_manager,
                 settings,
