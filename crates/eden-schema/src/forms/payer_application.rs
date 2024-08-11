@@ -8,6 +8,7 @@ pub struct InsertPayerApplicationForm<'a> {
     pub java_username: &'a str,
     pub bedrock_username: Option<&'a str>,
     pub answer: &'a str,
+    pub icon_url: &'a str,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]

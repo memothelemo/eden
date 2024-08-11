@@ -2,6 +2,7 @@ mod context;
 mod guild_create;
 mod interaction;
 mod message_create;
+mod reaction_add;
 mod ready;
 
 pub use self::context::*;
@@ -19,12 +20,13 @@ use twilight_gateway::Event;
 pub async fn handle_event(ctx: EventContext, event: Event) {
     let event_kind = event.kind();
     let result: Result<()> = match event {
-        Event::GuildCreate(guild) => self::guild_create::handle(&ctx, guild.0).await,
+        Event::GuildCreate(data) => self::guild_create::handle(&ctx, data.0).await,
         Event::InteractionCreate(data) => self::interaction::handle(&ctx, data.0).await,
         Event::MessageCreate(data) => self::message_create::handle(&ctx, data.0).await,
         Event::MessageDelete(..) => Ok(()),
         Event::MessageDeleteBulk(..) => Ok(()),
-        Event::MemberUpdate(..) => Ok(()),
+        Event::MessageUpdate(..) => Ok(()),
+        Event::ReactionAdd(data) => self::reaction_add::handle(&ctx, data.0).await,
         Event::Ready(data) => self::ready::handle(&ctx, &data).await,
         Event::Resumed => {
             debug!("successfully resumed gateway session");

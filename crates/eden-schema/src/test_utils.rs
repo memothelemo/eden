@@ -25,6 +25,7 @@ pub async fn generate_payer_application(conn: &mut sqlx::PgConnection) -> Result
         .java_username(java_username)
         .bedrock_username(None)
         .answer(answer)
+        .icon_url("https://example.com")
         .build();
 
     PayerApplication::insert(conn, form).await.anonymize_error()

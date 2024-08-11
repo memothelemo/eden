@@ -40,7 +40,8 @@ pub async fn reply_with_changed_value(
         .content(format!("**Changed \"{name}\" to**: `{value:?}`"))
         .build();
 
-    ctx.respond(data).await
+    ctx.respond(data).await?;
+    Ok(())
 }
 
 pub async fn reply_with_output(ctx: &CommandContext, name: &str, value: impl Debug) -> Result<()> {
@@ -48,5 +49,6 @@ pub async fn reply_with_output(ctx: &CommandContext, name: &str, value: impl Deb
         .content(format!("**{name}**: `{value:?}`"))
         .build();
 
-    ctx.respond(data).await
+    ctx.respond(data).await?;
+    Ok(())
 }

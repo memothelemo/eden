@@ -49,6 +49,7 @@ impl RunCommand for PayerPayBill {
             .content("**Please proceed to DMs for instructions.**")
             .build();
 
-        ctx.respond(data).await
+        ctx.respond(data).await?;
+        Ok(())
     }
 }

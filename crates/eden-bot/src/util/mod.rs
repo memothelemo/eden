@@ -1,8 +1,21 @@
-use twilight_model::guild::{Guild, Permissions, Role};
-use twilight_model::id::marker::RoleMarker;
+use twilight_model::guild::{Guild, Member, Permissions, Role};
+use twilight_model::id::marker::{GuildMarker, RoleMarker};
 use twilight_model::id::Id;
 
 pub mod http;
+pub mod image;
+
+#[must_use]
+pub fn get_guild_member_avatar_url(id: Id<GuildMarker>, member: &Member) -> String {
+    let user_id = member.user.id;
+    if let Some(hash) = member.avatar {
+        self::image::premium_member_avatar(id, user_id, hash)
+    } else if let Some(hash) = member.user.avatar {
+        self::image::user_avatar(user_id, hash)
+    } else {
+        self::image::default_user_avatar(user_id)
+    }
+}
 
 /// Gets the @everyone role from a guild.
 pub fn get_everyone_role(guild: &Guild) -> Option<&Role> {
@@ -26,4 +39,15 @@ pub fn get_member_role_perms(
             (*role_id, permissions)
         })
         .collect::<Vec<_>>()
+}
+
+/// Whether the input permission met the requirement permission unless
+/// the input permission has an administrator permission
+#[must_use]
+pub fn has_permission(input: Permissions, requirement: Permissions) -> bool {
+    if input.contains(Permissions::ADMINISTRATOR) {
+        true
+    } else {
+        input.contains(requirement)
+    }
 }

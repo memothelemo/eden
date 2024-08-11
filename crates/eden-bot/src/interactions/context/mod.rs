@@ -1,4 +1,4 @@
-use eden_utils::error::exts::{AnonymizedResultExt, IntoTypedError, ResultExt};
+use eden_utils::error::exts::{AnonymizedResultExt, IntoEdenResult, IntoTypedError, ResultExt};
 use eden_utils::Result;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::Span;
@@ -6,7 +6,7 @@ use twilight_model::channel::message::{AllowedMentions, Embed, MessageFlags};
 use twilight_model::http::interaction::{
     InteractionResponse, InteractionResponseData, InteractionResponseType,
 };
-use twilight_model::id::marker::{ChannelMarker, UserMarker};
+use twilight_model::id::marker::{ChannelMarker, MessageMarker, UserMarker};
 use twilight_model::{application::interaction::Interaction, id::Id};
 use twilight_util::builder::InteractionResponseDataBuilder;
 
@@ -44,7 +44,7 @@ impl<T> InteractionContext<T> {
     }
 
     #[tracing::instrument(skip_all, fields(%ephemeral))]
-    pub async fn defer(&self, ephemeral: bool) -> Result<()> {
+    pub async fn defer(&self, ephemeral: bool) -> Result<Id<MessageMarker>> {
         let mut data = self.build_response();
         if ephemeral {
             data = data.flags(MessageFlags::EPHEMERAL);
@@ -57,7 +57,11 @@ impl<T> InteractionContext<T> {
     }
 
     #[tracing::instrument(skip_all, fields(%ephemeral))]
-    pub async fn respond_with_embed(&self, embed: Embed, ephemeral: bool) -> Result<()> {
+    pub async fn respond_with_embed(
+        &self,
+        embed: Embed,
+        ephemeral: bool,
+    ) -> Result<Id<MessageMarker>> {
         let mut data = self.build_response().embeds(vec![embed]);
         if ephemeral {
             data = data.flags(MessageFlags::EPHEMERAL);
@@ -69,7 +73,7 @@ impl<T> InteractionContext<T> {
             .attach_printable("could not respond with embed")
     }
 
-    pub async fn respond(&self, data: InteractionResponseData) -> Result<()> {
+    pub async fn respond(&self, data: InteractionResponseData) -> Result<Id<MessageMarker>> {
         let kind = InteractionResponseType::ChannelMessageWithSource;
         self.send_response(Some(data), kind)
             .await
@@ -99,7 +103,7 @@ impl<T> InteractionContext<T> {
         &self,
         data: Option<InteractionResponseData>,
         kind: InteractionResponseType,
-    ) -> Result<()> {
+    ) -> Result<Id<MessageMarker>> {
         let http = self.bot.interaction();
         let responded_earlier = self.responded.load(Ordering::Relaxed);
 
@@ -155,12 +159,15 @@ impl<T> InteractionContext<T> {
                 follow_up = follow_up.tts(tts);
             }
 
-            follow_up
+            let message = follow_up
                 .await
-                .into_typed_error()
-                .attach_printable("could not follow up response")?;
+                .into_eden_error()
+                .attach_printable("could not follow up response")?
+                .model()
+                .await
+                .into_typed_error()?;
 
-            Ok(())
+            Ok(message.id)
         } else {
             http.create_response(
                 self.interaction.id,
@@ -168,11 +175,21 @@ impl<T> InteractionContext<T> {
                 &InteractionResponse { kind, data },
             )
             .await
-            .into_typed_error()
+            .into_eden_error()
             .attach_printable("could not create interaction response")?;
 
             self.responded.store(true, Ordering::Relaxed);
-            Ok(())
+
+            let request = http
+                .response(&self.interaction.token)
+                .await
+                .into_eden_error()
+                .attach_printable("could not fetch interaction respoonse")?
+                .model()
+                .await
+                .into_typed_error()?;
+
+            Ok(request.id)
         }
     }
 }

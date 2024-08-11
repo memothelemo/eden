@@ -15,6 +15,7 @@ use twilight_util::permission_calculator::PermissionCalculator;
 use crate::errors::RegisterCommandsError;
 use crate::interactions::tags::{CheckPermsInvokerTag, LackingPermissionsTag};
 use crate::interactions::LocalGuildContext;
+use crate::util::has_permission;
 use crate::util::http::request_for_model;
 use crate::Bot;
 
@@ -272,9 +273,7 @@ async fn check_bot_guild_permissions<T: CommandModel + RunCommand>(
 
     // Go with channel first perhaps
     if !channel_required.is_empty()
-        && !current_channel_permissions
-            .unwrap()
-            .contains(channel_required)
+        && !has_permission(current_channel_permissions.unwrap(), channel_required)
     {
         let tag =
             LackingPermissionsTag::new(current_channel_permissions.unwrap(), channel_required);
@@ -289,7 +288,7 @@ async fn check_bot_guild_permissions<T: CommandModel + RunCommand>(
     }
 
     // Go with channel first perhaps
-    if !current_guild_permissions.contains(guild_required) {
+    if !has_permission(current_guild_permissions, guild_required) {
         let tag = LackingPermissionsTag::new(current_guild_permissions, guild_required);
         Err(Error::context_anonymize(
             ErrorCategory::Guild(GuildErrorCategory::MissingGuildPermissions(
@@ -338,7 +337,7 @@ async fn check_user_guild_permissions<T: CommandModel + RunCommand>(
         );
     }
 
-    if !user_permissions.contains(required) {
+    if !has_permission(user_permissions, required) {
         Err(Error::context_anonymize(
             ErrorCategory::User(UserErrorCategory::MissingGuildPermissions),
             LackingUserPermissions(ctx.command_name()),

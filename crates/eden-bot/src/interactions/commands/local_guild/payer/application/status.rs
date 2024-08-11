@@ -33,7 +33,8 @@ impl RunCommand for PayerApplicationStatus {
                 .description(NO_APPLICATION_ERROR_DESC)
                 .build();
 
-            return ctx.respond_with_embed(embed, false).await;
+            ctx.respond_with_embed(embed, false).await?;
+            return Ok(());
         };
 
         let mut content = String::from("**Status**: ");
@@ -72,7 +73,8 @@ impl RunCommand for PayerApplicationStatus {
             .footer(EmbedFooterBuilder::new(footer).build())
             .build();
 
-        ctx.respond_with_embed(embed, false).await
+        ctx.respond_with_embed(embed, false).await?;
+        Ok(())
     }
 }
 

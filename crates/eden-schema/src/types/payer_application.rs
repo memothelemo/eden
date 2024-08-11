@@ -16,6 +16,7 @@ pub struct PayerApplication {
     pub accepted: Option<bool>,
     pub answer: String,
     pub deny_reason: Option<String>,
+    pub icon_url: Option<String>,
 }
 
 impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for PayerApplication {
@@ -30,6 +31,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for PayerApplication {
         let accepted = row.try_get("accepted")?;
         let answer = row.try_get("answer")?;
         let deny_reason = row.try_get("deny_reason")?;
+        let icon_url = row.try_get("icon_url")?;
 
         Ok(Self {
             id,
@@ -42,6 +44,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for PayerApplication {
             accepted,
             answer,
             deny_reason,
+            icon_url,
         })
     }
 }

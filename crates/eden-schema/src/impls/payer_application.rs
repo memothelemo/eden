@@ -10,6 +10,99 @@ use crate::forms::{InsertPayerApplicationForm, UpdatePayerApplicationForm};
 use crate::types::PayerApplication;
 
 impl PayerApplication {
+    pub async fn first_pending(conn: &mut sqlx::PgConnection) -> Result<Option<Self>, QueryError> {
+        sqlx::query_as::<_, Self>(
+            r"SELECT * FROM payer_applications WHERE accepted IS NULL ORDER BY created_at",
+        )
+        .fetch_optional(conn)
+        .await
+        .into_eden_error()
+        .change_context(QueryError)
+        .attach_printable("could not get first pending payer application")
+    }
+
+    // TODO: Solve the n-1 problem
+    pub async fn before_pending(
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
+    ) -> Result<Option<Self>, QueryError> {
+        /*
+        WITH entries
+        AS (
+            SELECT row_number() OVER (ORDER BY created_at), *
+            FROM payer_applications
+            WHERE accepted IS NULL
+        )
+        SELECT *
+        FROM entries
+        WHERE row_number IN (
+            SELECT row_number - 1
+            FROM entries
+            WHERE id = $1
+        );*/
+        sqlx::query_as::<_, Self>(
+            r"WITH entries AS (
+            SELECT row_number() OVER (ORDER BY created_at), *
+            FROM payer_applications
+            WHERE accepted IS NULL
+        )
+        SELECT *
+        FROM entries
+        WHERE row_number IN (
+            SELECT row_number - 1
+            FROM entries
+            WHERE id = $1
+        )",
+        )
+        .bind(id)
+        .fetch_optional(conn)
+        .await
+        .into_eden_error()
+        .change_context(QueryError)
+        .attach_printable("could not get previous pending payer application")
+    }
+
+    // TODO: Solve the n+1 problem
+    pub async fn after_pending(
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
+    ) -> Result<Option<Self>, QueryError> {
+        /*
+        WITH entries
+        AS (
+            SELECT row_number() OVER (ORDER BY created_at), *
+            FROM payer_applications
+            WHERE accepted IS NULL
+        )
+        SELECT *
+        FROM entries
+        WHERE row_number IN (
+            SELECT row_number + 1
+            FROM entries
+            WHERE id = $1
+        );*/
+        sqlx::query_as::<_, Self>(
+            r"WITH entries AS (
+                SELECT row_number() OVER (ORDER BY created_at), *
+                FROM payer_applications
+                WHERE accepted IS NULL
+            )
+            SELECT *
+            FROM entries
+            WHERE row_number IN (
+                SELECT row_number + 1
+                FROM entries
+                WHERE id = $1
+            )",
+        )
+        .bind(id)
+        .fetch_optional(conn)
+        .await
+        .into_eden_error()
+        .change_context(QueryError)
+        .attach_printable("could not get next pending payer application")
+    }
+
     pub async fn from_id(
         conn: &mut sqlx::PgConnection,
         id: Uuid,
@@ -60,8 +153,8 @@ impl PayerApplication {
         form: InsertPayerApplicationForm<'_>,
     ) -> Result<Self, QueryError> {
         sqlx::query_as::<_, Self>(
-            r"INSERT INTO payer_applications(name, user_id, java_username, bedrock_username, answer)
-            VALUES ($1, $2, $3, $4, $5)
+            r"INSERT INTO payer_applications(name, user_id, java_username, bedrock_username, answer, icon_url)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *",
         )
         .bind(form.name)
@@ -69,6 +162,7 @@ impl PayerApplication {
         .bind(form.java_username)
         .bind(form.bedrock_username)
         .bind(form.answer)
+        .bind(form.icon_url)
         .fetch_one(conn)
         .await
         .into_eden_error()
@@ -186,6 +280,7 @@ mod tests {
         let java_username = "fooooo";
         let bedrock_username = "fooooo_123";
         let answer = "I like strawberry pies";
+        let icon_url = "https://example.com";
 
         let form = InsertPayerApplicationForm::builder()
             .user_id(user_id)
@@ -193,6 +288,7 @@ mod tests {
             .java_username(java_username)
             .bedrock_username(Some(bedrock_username))
             .answer(answer)
+            .icon_url(icon_url)
             .build();
 
         let application = PayerApplication::insert(&mut conn, form).await?;
@@ -205,6 +301,7 @@ mod tests {
             Some(bedrock_username.to_string())
         );
         assert_eq!(application.answer, answer);
+        assert_eq!(application.icon_url, Some(icon_url.into()));
 
         Ok(())
     }
@@ -224,6 +321,7 @@ mod tests {
             .java_username(java_username)
             .bedrock_username(None)
             .answer(answer)
+            .icon_url("https://example.com")
             .build();
 
         let application = PayerApplication::insert(&mut conn, form).await?;
@@ -233,6 +331,7 @@ mod tests {
         assert_eq!(application.java_username, java_username);
         assert_eq!(application.bedrock_username, None);
         assert_eq!(application.answer, answer);
+        assert_eq!(application.icon_url, Some("https://example.com".into()));
 
         Ok(())
     }

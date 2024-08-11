@@ -33,7 +33,9 @@ impl RunCommand for Ping {
         }
 
         let data = data.content(content).build();
-        ctx.respond(data).await
+        ctx.respond(data).await?;
+
+        Ok(())
     }
 }
 

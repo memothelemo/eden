@@ -9,10 +9,12 @@ pub const CACHE_RESOURCE_TYPES: ResourceType = ResourceType::GUILD
 pub const INTENTS: Intents = Intents::GUILDS
     .union(Intents::DIRECT_MESSAGES)
     .union(Intents::GUILD_MEMBERS)
-    .union(Intents::GUILD_MESSAGES);
+    .union(Intents::GUILD_MESSAGES)
+    .union(Intents::GUILD_MESSAGE_REACTIONS);
 
 pub const FILTERED_EVENT_TYPES: EventTypeFlags = EventTypeFlags::READY
     .union(EventTypeFlags::RESUMED)
     .union(EventTypeFlags::INTERACTION_CREATE)
     .union(EventTypeFlags::DIRECT_MESSAGES)
-    .union(EventTypeFlags::GUILD_CREATE);
+    .union(EventTypeFlags::GUILD_CREATE)
+    .union(EventTypeFlags::REACTION_ADD);

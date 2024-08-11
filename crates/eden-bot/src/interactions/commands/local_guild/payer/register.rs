@@ -16,7 +16,10 @@ use twilight_model::{
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use super::{CommandContext, RunCommand};
-use crate::interactions::{embeds, record_local_guild_ctx, LocalGuildContext};
+use crate::{
+    interactions::{embeds, record_local_guild_ctx, LocalGuildContext},
+    util::http::request_for_model,
+};
 
 const ERROR_TITLE: &str = "Cannot register as payer";
 const ALREADY_APPLIED_ERROR_DESC: &str = "**You already applied as a monthly contributor!**\n\nIf you want to see your application status, you may do so by running this command: `/payer application status`\n\nIf your application is still pending, please wait for admins to approve your application.\n\n**❤️      Good luck and I hope you'll be a monthly contributor!**";
@@ -36,7 +39,8 @@ impl RunCommand for PayerRegister {
                 .description("You're already a payer.")
                 .build();
 
-            return ctx.respond_with_embed(embed, false).await;
+            ctx.respond_with_embed(embed, false).await?;
+            return Ok(());
         }
 
         // Checking they have already applied for being a monthly contributor
@@ -47,7 +51,8 @@ impl RunCommand for PayerRegister {
                 .description(ALREADY_APPLIED_ERROR_DESC)
                 .build();
 
-            return ctx.respond_with_embed(embed, true).await;
+            ctx.respond_with_embed(embed, true).await?;
+            return Ok(());
         }
 
         let result = if ctx.settings.payers.allow_self_register {
@@ -59,7 +64,9 @@ impl RunCommand for PayerRegister {
         // duplicated usernme?
         if result.is_unique_violation() {
             let embed = generate_occupied_username_embed(self);
-            return ctx.respond_with_embed(embed, false).await;
+
+            ctx.respond_with_embed(embed, false).await?;
+            return Ok(());
         }
 
         result?;
@@ -119,12 +126,20 @@ async fn submit_application(
         return Ok(());
     };
 
+    let member = request_for_model(
+        &ctx.bot.http,
+        ctx.bot.http.guild_member(ctx.guild_id, ctx.author.id),
+    )
+    .await?;
+
+    let avatar_url = crate::util::get_guild_member_avatar_url(ctx.guild_id, &member);
     let form = InsertPayerApplicationForm::builder()
         .user_id(ctx.author.id)
         .name(&ctx.author.name)
         .java_username(&args.java_username)
         .bedrock_username(args.bedrock_username.as_deref())
         .answer(&reason)
+        .icon_url(&avatar_url)
         .build();
 
     trace!("inserting payer application");

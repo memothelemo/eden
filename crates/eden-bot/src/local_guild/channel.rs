@@ -8,6 +8,7 @@ use twilight_model::id::Id;
 use twilight_util::permission_calculator::PermissionCalculator;
 
 use crate::errors::SendWelcomeMessageError;
+use crate::util::has_permission;
 use crate::Bot;
 
 /// Attempts to find sendable channels for the bot to send a message with.
@@ -33,7 +34,7 @@ pub fn find_sendable_guild_text_channel(bot: &Bot, guild: &Guild) -> Option<Id<C
 
             // we do not want the bot to send something in nsfw channel
             let is_nsfw = channel.nsfw.unwrap_or_default();
-            let can_bot_send_message_here = permissions.contains(Permissions::SEND_MESSAGES);
+            let can_bot_send_message_here = has_permission(permissions, Permissions::SEND_MESSAGES);
             let is_text_channel = channel.kind == ChannelType::GuildText;
             can_bot_send_message_here && is_text_channel && !is_nsfw
         })
