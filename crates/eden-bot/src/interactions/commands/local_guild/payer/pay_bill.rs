@@ -41,7 +41,7 @@ impl RunCommand for PayerPayBill {
 
         request_for_model(&ctx.bot.http, result).await?;
 
-        let state = PayerPayBillState::new(dm_channel_id, self.method);
+        let state = PayerPayBillState::new(ctx.author.id, dm_channel_id, self.method);
         let command = StatefulCommand::PayerPayBill(state);
         ctx.bot.command_state.insert(ctx.interaction.id, command);
 

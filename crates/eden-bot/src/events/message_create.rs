@@ -20,9 +20,13 @@ pub async fn handle(ctx: &EventContext, message: Message) -> Result<()> {
     }
 
     trace!("received human message {}", message.id);
-
-    let trigger = StatefulCommandTrigger::SentMessage(message.channel_id, message.id);
-    ctx.bot.command_state.trigger_commands(trigger);
+    ctx.bot
+        .command_state
+        .trigger_commands(StatefulCommandTrigger::SentMessage(
+            message.author.id,
+            message.channel_id,
+            message.id,
+        ));
 
     Ok(())
 }

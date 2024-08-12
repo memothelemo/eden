@@ -8,7 +8,7 @@ use strum_macros::Display;
 use tokio::sync::Mutex;
 use tokio_util::task::TaskTracker;
 use tracing::{debug, trace, warn, Span};
-use twilight_model::id::marker::{ChannelMarker, InteractionMarker, MessageMarker};
+use twilight_model::id::marker::{ChannelMarker, InteractionMarker, MessageMarker, UserMarker};
 use twilight_model::id::Id;
 
 use crate::{Bot, BotRef};
@@ -200,15 +200,15 @@ pub enum StatefulCommandTrigger {
     /// A user or bot reacted with left arrow emoji.
     ///
     /// It can be used to move into previous page of entries.
-    ReactedLeftArrow(Id<MessageMarker>),
+    ReactedLeftArrow(Id<MessageMarker>, Id<MessageMarker>),
 
     /// A user or bot reacted with right arrow emoji.
     ///
     /// It can be used to move into next page of entries.
-    ReactedRightArrow(Id<MessageMarker>),
+    ReactedRightArrow(Id<MessageMarker>, Id<MessageMarker>),
 
     /// A user sent a message
-    SentMessage(Id<ChannelMarker>, Id<MessageMarker>),
+    SentMessage(Id<UserMarker>, Id<ChannelMarker>, Id<MessageMarker>),
 }
 
 struct CommandStateInfo {

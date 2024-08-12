@@ -11,23 +11,29 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
 use tracing::warn;
-use twilight_model::id::marker::{ChannelMarker, MessageMarker};
+use twilight_model::id::marker::{ChannelMarker, MessageMarker, UserMarker};
 use twilight_model::id::Id;
 
 #[derive(Debug)]
 pub struct PayerPayBillState {
     pub busy: AtomicBool,
     pub dm_channel_id: Id<ChannelMarker>,
+    pub invoker: Id<UserMarker>,
     pub method: PaymentMethodOption,
     pub last_user_message_id: Mutex<Option<Id<MessageMarker>>>,
 }
 
 impl PayerPayBillState {
     #[must_use]
-    pub fn new(dm_channel_id: Id<ChannelMarker>, method: PaymentMethodOption) -> Self {
+    pub fn new(
+        invoker: Id<UserMarker>,
+        dm_channel_id: Id<ChannelMarker>,
+        method: PaymentMethodOption,
+    ) -> Self {
         Self {
             busy: AtomicBool::new(false),
             dm_channel_id,
+            invoker,
             method,
             last_user_message_id: Mutex::new(None),
         }
@@ -48,11 +54,11 @@ impl AnyStatefulCommand for PayerPayBillState {
         bot: &Bot,
         trigger: StatefulCommandTrigger,
     ) -> Result<CommandTriggerAction> {
-        let StatefulCommandTrigger::SentMessage(channel_id, message_id) = trigger else {
+        let StatefulCommandTrigger::SentMessage(user_id, channel_id, message_id) = trigger else {
             return Ok(CommandTriggerAction::Nothing);
         };
 
-        if channel_id != self.dm_channel_id {
+        if channel_id != self.dm_channel_id || user_id != self.invoker {
             return Ok(CommandTriggerAction::Nothing);
         }
         self.last_user_message_id.lock().await.replace(message_id);
