@@ -9,6 +9,7 @@ mod suggestions;
 mod tests;
 
 pub mod errors;
+pub mod features;
 pub mod shard;
 pub mod tasks;
 pub mod util;
