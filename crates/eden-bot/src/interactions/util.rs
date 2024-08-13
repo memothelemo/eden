@@ -5,6 +5,7 @@ use eden_utils::sql::SqlErrorExt;
 use itertools::Itertools;
 use thiserror::Error;
 use twilight_model::{channel::message::Embed, http::interaction::InteractionResponseData};
+use twilight_util::builder::embed::EmbedFooterBuilder;
 use twilight_util::builder::{embed::EmbedBuilder, InteractionResponseDataBuilder};
 
 #[derive(Debug, Error)]
@@ -15,11 +16,12 @@ pub struct UnknownCommandError(pub(super) String);
 pub fn from_error(
     admin_mode: bool,
     developer_mode: bool,
+    is_sentry_enabled: bool,
     error: &eden_utils::Error,
 ) -> InteractionResponseData {
     let mut embeds = Vec::new();
     if developer_mode {
-        render_error_embeds(error, &mut embeds);
+        render_error_embeds(error, &mut embeds, is_sentry_enabled);
         return InteractionResponseDataBuilder::new()
             .content(consts::ERROR_OCCURRED_MESSAGE)
             .embeds(embeds)
@@ -69,7 +71,7 @@ pub fn from_error(
             }
         },
         ErrorCategory::User(category) => match category {
-            UserErrorCategory::MissingGuildPermissions => {
+            UserErrorCategory::MissingPermissions => {
                 super::embeds::builders::error("Access denied", None)
                     .description(consts::NOT_ALLOWED_MSG)
                     .build()
@@ -82,9 +84,22 @@ pub fn from_error(
             } else {
                 consts::INTERNAL_MSG
             };
-            super::embeds::builders::error("Something went wrong!", None)
-                .description(msg)
-                .build()
+
+            let footer = if is_sentry_enabled {
+                let id = eden_utils::sentry::capture_error_with_id(error);
+                Some(EmbedFooterBuilder::new(format!("Error ID: {id}")).build())
+            } else {
+                None
+            };
+
+            let mut builder =
+                super::embeds::builders::error("Something went wrong!", None).description(msg);
+
+            if let Some(footer) = footer {
+                builder = builder.footer(footer);
+            }
+
+            builder.build()
         }
     };
 
@@ -93,7 +108,18 @@ pub fn from_error(
         .build()
 }
 
-fn render_error_embeds(error: &eden_utils::Error, embeds: &mut Vec<Embed>) {
+fn render_error_embeds(
+    error: &eden_utils::Error,
+    embeds: &mut Vec<Embed>,
+    is_sentry_enabled: bool,
+) {
+    let footer = if !error.get_category().is_user_error() && is_sentry_enabled {
+        let sentry_event_id = eden_utils::sentry::capture_error_with_id(error);
+        Some(EmbedFooterBuilder::new(format!("Error ID: {sentry_event_id}")).build())
+    } else {
+        None
+    };
+
     // Output includes some of ANSI escape sequences since tracing_error
     // renders out the entire span trace by using the global subscriber
     // set from tracing crate.
@@ -111,10 +137,10 @@ fn render_error_embeds(error: &eden_utils::Error, embeds: &mut Vec<Embed>) {
             break;
         }
 
-        let embed = EmbedBuilder::new()
-            .description(format!("```{chunk}```"))
-            .build();
-
-        embeds.push(embed);
+        let mut embed = EmbedBuilder::new().description(format!("```{chunk}```"));
+        if let Some(footer) = footer.clone() {
+            embed = embed.footer(footer);
+        }
+        embeds.push(embed.build());
     }
 }

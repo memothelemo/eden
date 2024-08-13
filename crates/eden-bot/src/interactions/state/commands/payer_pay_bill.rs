@@ -70,8 +70,12 @@ impl AnyStatefulCommand for PayerPayBillState {
             Ok(n) => n,
             Err(error) => {
                 let error = error.anonymize();
-                warn!(%error, "unable to get message data from Discord");
-                self.reply_message(bot, UNABLE_TO_READ_MSG).await?;
+                if !bot.is_sentry_enabled() {
+                    warn!(%error, "unable to get message data from Discord");
+                }
+                self.reply_with_error(bot, UNABLE_TO_READ_MSG, &error)
+                    .await?;
+
                 return Ok(CommandTriggerAction::Continue);
             }
         };
@@ -93,6 +97,7 @@ impl AnyStatefulCommand for PayerPayBillState {
             .extension()
             .map(|v| v.to_string_lossy().to_string())
             .unwrap_or_default();
+
         let user_id = message.author.id;
 
         let task = tasks::AlertPayment {
@@ -106,9 +111,13 @@ impl AnyStatefulCommand for PayerPayBillState {
         // If it does send, relay it to the alert channel
         if let Err(error) = bot.queue.schedule(task, Scheduled::now()).await {
             let error = error.anonymize();
-            warn!(%error, "failed to schedule task to alert new payment to the admins");
+            if !bot.is_sentry_enabled() {
+                warn!(%error, "failed to schedule task to alert new payment to the admins");
+            }
 
-            self.reply_message(bot, UNABLE_TO_READ_MSG).await?;
+            self.reply_with_error(bot, UNABLE_TO_READ_MSG, &error)
+                .await?;
+
             return Ok(CommandTriggerAction::Continue);
         }
 
@@ -130,6 +139,20 @@ impl AnyStatefulCommand for PayerPayBillState {
 }
 
 impl PayerPayBillState {
+    async fn reply_with_error(
+        &self,
+        bot: &Bot,
+        message: &str,
+        error: &eden_utils::Error,
+    ) -> Result<()> {
+        let mut message = message.to_string();
+        if bot.is_sentry_enabled() {
+            let id = eden_utils::sentry::capture_error_with_id(error);
+            message.push_str(&format!("\n\n**Error ID**: {id}"));
+        }
+        self.reply_message(bot, &message).await
+    }
+
     #[tracing::instrument(skip_all)]
     async fn reply_message(&self, bot: &Bot, message: &str) -> Result<()> {
         let last_user_message_id = *self.last_user_message_id.lock().await;

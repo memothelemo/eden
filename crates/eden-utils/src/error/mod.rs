@@ -20,7 +20,7 @@ pub type Result<T, E = self::any::AnonymizedError> = std::result::Result<T, Erro
 
 #[must_use]
 pub struct Error<T = self::any::AnonymizedError> {
-    category: ErrorCategory,
+    pub(crate) category: ErrorCategory,
     pub(crate) report: Report,
     trace: SpanTrace,
     _phantom: PhantomData<T>,

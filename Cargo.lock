@@ -937,9 +937,12 @@ dependencies = [
  "error-stack",
  "fundu",
  "hex",
+ "itertools 0.13.0",
  "pin-project-lite",
  "sentry",
+ "sentry-backtrace",
  "serde",
+ "serde_json",
  "serde_with",
  "sha2",
  "sqlx",
@@ -998,10 +1001,11 @@ dependencies = [
 [[package]]
 name = "error-stack"
 version = "0.4.2-memothelemo.1"
-source = "git+https://github.com/memothelemo/error-stack?rev=f52d870#f52d870943be74b1a843926113c82a4ccc47fbac"
+source = "git+https://github.com/memothelemo/error-stack?rev=4d87941#4d87941745dccde626fd43338c86f8d9b7577d32"
 dependencies = [
  "anyhow",
  "rustc_version",
+ "tracing-error",
 ]
 
 [[package]]

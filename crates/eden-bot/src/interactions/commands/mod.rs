@@ -92,10 +92,15 @@ pub async fn handle(ctx: CommandContext) -> Result<()> {
 
     let mut conn = ctx.bot.db_read().await?;
     let user = User::get_or_insert(&mut conn, ctx.invoker_id()).await?;
-    let data = super::util::from_error(is_admin, user.developer_mode, &error);
+    let data = super::util::from_error(
+        is_admin,
+        user.developer_mode,
+        ctx.bot.is_sentry_enabled(),
+        &error,
+    );
 
     // log error messages for non-user errors.
-    if !error.get_category().is_user_error() {
+    if !error.get_category().is_user_error() && !ctx.bot.is_sentry_enabled() {
         warn!(%error, "failed to run command {name:?}");
     }
 
@@ -340,7 +345,7 @@ async fn check_user_guild_permissions<T: CommandModel + RunCommand>(
 
     if !user_permissions.contains(required) {
         Err(Error::context_anonymize(
-            ErrorCategory::User(UserErrorCategory::MissingGuildPermissions),
+            ErrorCategory::User(UserErrorCategory::MissingPermissions),
             LackingUserPermissions(ctx.command_name()),
         ))
         .attach(LackingPermissionsTag::new(user_permissions, required))

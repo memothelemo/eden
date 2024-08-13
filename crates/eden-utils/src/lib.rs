@@ -1,4 +1,4 @@
-#![feature(async_fn_track_caller)]
+#![feature(async_fn_track_caller, backtrace_frames, let_chains, thread_id_value)]
 
 pub mod serial;
 

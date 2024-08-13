@@ -25,6 +25,7 @@ fn start() -> Result<()> {
         .into_typed_error()
         .attach_printable("could not build tokio runtime")?
         .block_on(bootstrap(settings))
+        .inspect_err(eden_utils::sentry::capture_error)
 }
 
 #[allow(clippy::unwrap_used)]
