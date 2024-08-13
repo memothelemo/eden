@@ -72,7 +72,7 @@ fn make_span_exception<C>(error: &Error<C>, exceptions: &mut Vec<Exception>) {
             function: Some(metadata.name().into()),
             abs_path: metadata.file().map(|v| v.into()),
             lineno: metadata.line().map(|v| v as u64),
-            module: metadata.module_path().map(|v| v.into()),
+            module: Some(format!("{}::{}", metadata.target(), metadata.name())),
             vars: map,
             ..Default::default()
         };
