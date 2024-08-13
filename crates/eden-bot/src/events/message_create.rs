@@ -33,6 +33,31 @@ pub async fn handle(ctx: &EventContext, message: Message) -> Result<()> {
         ));
 
     // TODO: check channel permissions first before sending the message
+    if is_in_all_caps(&message.content) && message.guild_id.is_some() {
+        trace!("alerting the user not to scream");
+
+        let request = ctx
+            .bot
+            .http
+            .create_message(message.channel_id)
+            .content("Keep your voice down!")
+            .unwrap()
+            .reply(message.id);
+
+        if let Err(error) = request_for_model(&ctx.bot.http, request).await {
+            let error = error.anonymize();
+            let has_missing_access = error
+                .discord_http_error_info()
+                .map(|v| v.has_missing_access())
+                .unwrap_or_default();
+
+            if !has_missing_access {
+                warn!(%error, "could not alert all caps message warning to the user");
+            }
+        }
+
+        return Ok(());
+    }
 
     // don't actually do this if we're in dms
     if message.guild_id.is_some()
@@ -41,7 +66,6 @@ pub async fn handle(ctx: &EventContext, message: Message) -> Result<()> {
         trace!("relying back introductory message");
 
         if let Err(error) = respond_introduce_message(ctx, &message, &name).await {
-            // if it is a missing access error, ignore it!
             let has_missing_access = error
                 .discord_http_error_info()
                 .map(|v| v.has_missing_access())
@@ -55,6 +79,13 @@ pub async fn handle(ctx: &EventContext, message: Message) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn is_in_all_caps(content: &str) -> bool {
+    content
+        .chars()
+        .filter(|v| v.is_alphabetic())
+        .all(|v| v.is_uppercase())
 }
 
 // We don't want to let Eden say "Hi <swear word>" when the user said that so.
