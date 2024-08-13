@@ -69,10 +69,10 @@ fn make_span_exception<C>(error: &Error<C>, exceptions: &mut Vec<Exception>) {
         );
 
         let frame = sentry::protocol::Frame {
-            function: Some(metadata.name().into()),
+            // Sentry won't let me use the target for the module name
+            function: Some(format!("{}::{}", metadata.target(), metadata.name()).into()),
             abs_path: metadata.file().map(|v| v.into()),
             lineno: metadata.line().map(|v| v as u64),
-            module: Some(format!("{}::{}", metadata.target(), metadata.name())),
             vars: map,
             ..Default::default()
         };
