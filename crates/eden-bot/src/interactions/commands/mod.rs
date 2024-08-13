@@ -340,7 +340,7 @@ async fn check_user_guild_permissions<T: CommandModel + RunCommand>(
 
     if !user_permissions.contains(required) {
         Err(Error::context_anonymize(
-            ErrorCategory::User(UserErrorCategory::MissingGuildPermissions),
+            ErrorCategory::User(UserErrorCategory::MissingPermissions),
             LackingUserPermissions(ctx.command_name()),
         ))
         .attach(LackingPermissionsTag::new(user_permissions, required))

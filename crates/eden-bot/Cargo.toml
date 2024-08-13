@@ -30,7 +30,7 @@ tracing.workspace = true
 pulldown-cmark = "0.11.0"
 regex = "*"
 rustrict = "0.7.26"
-itertools = "0.13.0"
+itertools.workspace = true
 strip-ansi-escapes = "0.2.0"
 
 # twilight crates

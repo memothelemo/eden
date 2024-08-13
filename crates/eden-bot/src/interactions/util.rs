@@ -69,7 +69,7 @@ pub fn from_error(
             }
         },
         ErrorCategory::User(category) => match category {
-            UserErrorCategory::MissingGuildPermissions => {
+            UserErrorCategory::MissingPermissions => {
                 super::embeds::builders::error("Access denied", None)
                     .description(consts::NOT_ALLOWED_MSG)
                     .build()
