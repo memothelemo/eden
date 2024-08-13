@@ -10,6 +10,11 @@ impl Bot {
         let guild_id = item.guild_id();
         self.0.settings.bot.local_guild.id == guild_id
     }
+
+    #[must_use]
+    pub fn is_sentry_enabled(&self) -> bool {
+        self.0.settings.sentry.is_some()
+    }
 }
 
 trait GetGuildId {

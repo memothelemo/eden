@@ -79,8 +79,8 @@ fn event_filter(metadata: &Metadata<'_>) -> EventFilter {
     match metadata.level() {
         &Level::ERROR => EventFilter::Exception,
         &Level::WARN if has_error => EventFilter::Exception,
-        &Level::WARN => EventFilter::Breadcrumb,
-        &Level::INFO | &Level::DEBUG | &Level::TRACE => EventFilter::Breadcrumb,
+        &Level::WARN | &Level::INFO => EventFilter::Breadcrumb,
+        &Level::DEBUG | &Level::TRACE => EventFilter::Ignore,
     }
 }
 

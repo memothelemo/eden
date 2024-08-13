@@ -80,7 +80,9 @@ impl AnyStatefulCommand for PayerApplicationPendingState {
             Ok(true) => Ok(CommandTriggerAction::Continue),
             Ok(false) => Ok(CommandTriggerAction::Done),
             Err(error) => {
-                warn!(%error, "unable to shift current pending application to the {direction}");
+                if !bot.is_sentry_enabled() {
+                    warn!(%error, "unable to shift current pending application to the {direction}");
+                }
 
                 let developer_mode = self
                     .has_user_enable_developer_mode(bot)
@@ -89,7 +91,12 @@ impl AnyStatefulCommand for PayerApplicationPendingState {
 
                 clear_reactions(bot, self.channel_id, self.message_id).await?;
 
-                let data = crate::interactions::util::from_error(false, developer_mode, &error);
+                let data = crate::interactions::util::from_error(
+                    false,
+                    developer_mode,
+                    bot.is_sentry_enabled(),
+                    &error,
+                );
                 let embeds = data.embeds.unwrap_or_default();
 
                 bot.interaction()

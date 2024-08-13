@@ -10,7 +10,7 @@ pub const INTENTS: Intents = Intents::GUILDS
     .union(Intents::DIRECT_MESSAGES)
     .union(Intents::GUILD_MEMBERS)
     .union(Intents::GUILD_MESSAGES)
-    .union(Intents::GUILD_MESSAGE_REACTIONS);
+    .union(Intents::MESSAGE_CONTENT);
 
 pub const FILTERED_EVENT_TYPES: EventTypeFlags = EventTypeFlags::READY
     .union(EventTypeFlags::RESUMED)

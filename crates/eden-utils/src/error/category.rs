@@ -15,7 +15,7 @@ pub enum ErrorCategory {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UserErrorCategory {
-    MissingGuildPermissions,
+    MissingPermissions,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

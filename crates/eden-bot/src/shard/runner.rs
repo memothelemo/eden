@@ -73,6 +73,10 @@ impl ShardRunner {
     pub async fn run(mut self) {
         debug!("starting shard {}", self.shard.id());
         loop {
+            let mut handle_latency = self.handle.latency.lock().await;
+            *handle_latency = self.shard.latency().clone();
+            drop(handle_latency);
+
             let status = self.shard.status().clone();
             if status != self.last_status {
                 let mut handle_status = self.handle.status.lock().await;
@@ -292,8 +296,9 @@ use log_shard_error;
 #[derive(Debug, Clone)]
 pub struct ShardHandle {
     id: ShardId,
-    latency: Arc<Mutex<Latency>>,
     status: Arc<Mutex<ConnectionStatus>>,
+
+    pub(super) latency: Arc<Mutex<Latency>>,
     pub(super) runner_tx: Sender<ShardRunnerMessage>,
 }
 

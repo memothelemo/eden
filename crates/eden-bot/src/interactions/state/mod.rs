@@ -208,7 +208,7 @@ pub enum StatefulCommandTrigger {
     ReactedRightArrow(Id<UserMarker>, Id<MessageMarker>),
 
     /// A user sent a message
-    SentMessage(Id<ChannelMarker>, Id<MessageMarker>),
+    SentMessage(Id<UserMarker>, Id<ChannelMarker>, Id<MessageMarker>),
 }
 
 struct CommandStateInfo {

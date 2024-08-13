@@ -3,7 +3,7 @@ members = ["crates/*", "eden", "xtask"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 authors = ["memothelemo <dev@memothelemo.xyz>"]
 edition = "2021"
 license = "AGPL-2.0"
@@ -29,7 +29,8 @@ serde_json = "1.0.120"
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
 
 # core crates
-error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "f52d870" }
+error-stack = { git = "https://github.com/memothelemo/error-stack", rev = "4d87941", features = ["spantrace"] }
+itertools = "0.13.0"
 typed-builder = "0.18.2"
 
 # macros
