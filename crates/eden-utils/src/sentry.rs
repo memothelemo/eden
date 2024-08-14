@@ -77,6 +77,7 @@ fn make_span_exception<C>(error: &Error<C>, exceptions: &mut Vec<Exception>) {
         frames.push(frame);
         true
     });
+    frames.reverse();
 
     exception.stacktrace = Some(Stacktrace {
         frames,
