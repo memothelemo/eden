@@ -63,10 +63,8 @@ fn make_span_exception<C>(error: &Error<C>, exceptions: &mut Vec<Exception>) {
     let mut frames = Vec::new();
     span.with_spans(|metadata, fields| {
         let mut map = Map::new();
-        map.insert(
-            "fields".to_string(),
-            serde_json::Value::String(fields.into()),
-        );
+        let fields = strip_ansi_escapes::strip_str(fields);
+        map.insert("fields".to_string(), serde_json::Value::String(fields));
 
         let frame = sentry::protocol::Frame {
             // Sentry won't let me use the target for the module name

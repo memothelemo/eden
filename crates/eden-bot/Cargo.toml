@@ -31,7 +31,7 @@ pulldown-cmark = "0.11.0"
 regex = "*"
 rustrict = "0.7.26"
 itertools.workspace = true
-strip-ansi-escapes = "0.2.0"
+strip-ansi-escapes.workspace = true
 
 # twilight crates
 twilight-cache-inmemory = { version = "0.15.4", features = ["permission-calculator"] }
