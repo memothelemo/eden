@@ -18,6 +18,7 @@ pub use ::error_stack::Context;
 
 pub type Result<T, E = self::any::AnonymizedError> = std::result::Result<T, Error<E>>;
 
+// TODO: Make its type size in 64 bits
 #[must_use]
 pub struct Error<T = self::any::AnonymizedError> {
     pub(crate) category: ErrorCategory,
@@ -227,11 +228,10 @@ impl fmt::Debug for Error {
     }
 }
 
-impl fmt::Display for Error {
+impl<C> fmt::Display for Error<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt::Display::fmt(&self.category, f)?;
-        writeln!(f, ": {:?}", self.report)?;
-        fmt::Display::fmt(&self.trace, f)
+        writeln!(f, ": {:?}", self.report)
     }
 }
 
