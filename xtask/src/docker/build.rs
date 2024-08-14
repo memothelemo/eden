@@ -36,26 +36,50 @@ pub struct BuildArgs {
     /// followed from the previous lines.
     #[arg(short, long, env = "EDEN_XTASK_DOCKER_IMAGE_NAME")]
     tag: String,
+
+    /// Builds Eden docker image with the image version as the current version
+    /// of this repository by utilizing the `CARGO_PKG_VERSION` environment variable
+    /// during compile time.
+    ///
+    /// **Instead of building Docker image using `xtask docker build`**:
+    /// ```sh
+    /// docker build . -t "memothelemo/eden:dev" ...
+    /// ```
+    ///
+    /// **It will be like this**:
+    /// ```sh
+    /// # env!("CARGO_PKG_VERSION") = "1.0.0"
+    /// docker build . -t "memothelemo/eden:1.0.0" ...
+    /// ```
+    ///
+    /// It defaults to `dev` if not set as a flag in the command line.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    use_current_version: bool,
 }
 
 pub fn run(docker_path: PathBuf, args: &BuildArgs) -> Result<()> {
     let workspace_path = env!("CARGO_WORKSPACE_DIR");
 
+    debug!("args.debug = {}", args.debug);
+    debug!("args.use_current_version = {}", args.use_current_version);
     debug!("build.commit_branch = {}", build::COMMIT_BRANCH);
     debug!("build.commit_hash = {}", build::COMMIT_HASH);
-    debug!("debug = {}", args.debug);
     debug!("docker.path = {}", docker_path.to_string_lossy());
     debug!("workspace.path = {workspace_path}");
     check_buildx_installation(&docker_path)?;
 
+    let version = match args.use_current_version {
+        true => env!("CARGO_PKG_VERSION"),
+        false => "dev",
+    };
+    debug!("using version = {version}");
+
+    let tag = format!("{}:{version}", args.tag);
     if log_enabled!(log::Level::Info) {
-        info!("Building Eden docker image...");
+        info!("Building Eden docker image... tag = {tag:?}");
     } else {
-        println!("Building Eden docker image...");
+        println!("Building Eden docker image... tag = {tag:?}");
     }
-
-    let tag = format!("{}:dev", args.tag);
-
     let mut child = Command::new(docker_path)
         .args(&["build", workspace_path, "-t", &tag])
         .args(&[
