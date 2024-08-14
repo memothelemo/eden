@@ -1,3 +1,5 @@
+use serde::ser::SerializeMap;
+use serde::Serialize;
 use std::borrow::Cow;
 use std::fmt::Display;
 
@@ -28,8 +30,20 @@ impl AsRef<str> for Suggestion {
     }
 }
 
+impl Serialize for Suggestion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("suggestion", &self.0)?;
+        map.end()
+    }
+}
+
 impl Suggestion {
     pub(crate) fn install_hook() {
+        crate::Error::install_serde_hook::<Self>();
         crate::Error::install_hook::<Self>(move |this, ctx| {
             ctx.push_body(format!("suggestion: {}", this.0));
         });

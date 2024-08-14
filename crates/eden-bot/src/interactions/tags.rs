@@ -1,4 +1,5 @@
 use eden_utils::Error;
+use serde::{ser::SerializeMap, Serialize};
 use twilight_model::guild::Permissions;
 
 #[derive(Clone, Copy)]
@@ -6,8 +7,22 @@ pub struct CheckPermsInvokerTag {
     pub is_admin: bool,
 }
 
+impl Serialize for CheckPermsInvokerTag {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // this is to differentiate various attachments
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("_type", "CHECK_PERMS_INVOKER")?;
+        map.serialize_entry("is_admin", &self.is_admin)?;
+        map.end()
+    }
+}
+
 impl CheckPermsInvokerTag {
     fn install_hook() {
+        Error::install_serde_hook::<Self>();
         Error::install_hook::<Self>(|_this, _ctx| {});
     }
 }
@@ -26,9 +41,23 @@ impl LackingPermissionsTag {
     }
 
     fn install_hook() {
+        Error::install_serde_hook::<Self>();
         Error::install_hook::<Self>(|this, ctx| {
             ctx.push_body(format!("missing permissions: {:?}", this.0));
         });
+    }
+}
+
+impl Serialize for LackingPermissionsTag {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // this is to differentiate various attachments
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("_type", "LACKED_PERMISSIONS")?;
+        map.serialize_entry("required", &self.0)?;
+        map.end()
     }
 }
 

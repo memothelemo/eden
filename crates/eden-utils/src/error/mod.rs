@@ -1,4 +1,5 @@
 use error_stack::iter::RequestRef;
+use error_stack::serde::SerializeFn;
 use error_stack::Report;
 use std::fmt;
 use std::marker::PhantomData;
@@ -197,6 +198,18 @@ impl Error {
         hook: impl Fn(&T, &mut error_stack::fmt::HookContext<T>) + Send + Sync + 'static,
     ) {
         error_stack::Report::install_debug_hook::<T>(hook);
+    }
+
+    /// Wrapper of [`Report::install_serde_hook`].
+    pub fn install_serde_hook<T: serde::Serialize + Send + Sync + 'static>() {
+        error_stack::Report::install_serde_hook::<T>();
+    }
+
+    /// Wrapper of [`Report::install_custom_serde_hook`].
+    pub fn install_custom_serde_hook<T: Send + Sync + 'static>(
+        closure: impl for<'a> SerializeFn<'a, T>,
+    ) {
+        error_stack::Report::install_custom_serde_hook(closure);
     }
 
     /// Installs hooks from all errors and tags in [`eden_utils`](crate)

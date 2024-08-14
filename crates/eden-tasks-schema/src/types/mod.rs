@@ -67,7 +67,8 @@ pub enum TaskPriority {
     High,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
+#[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "task_status", rename_all = "lowercase")]
 pub enum TaskStatus {
     Failed,

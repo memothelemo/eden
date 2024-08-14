@@ -1,4 +1,7 @@
-#[derive(Debug)]
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum DiscordHttpErrorInfo {
     Outage,
     Response(u64),
@@ -29,6 +32,7 @@ impl DiscordHttpErrorInfo {
     }
 
     pub(crate) fn install_hook() {
+        crate::Error::install_serde_hook::<Self>();
         crate::Error::install_hook::<Self>(|this, ctx| match this {
             Self::Outage => {
                 ctx.push_body("discord is down");

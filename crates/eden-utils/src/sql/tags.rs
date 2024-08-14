@@ -1,6 +1,9 @@
+use serde::{ser::SerializeMap, Deserialize, Serialize};
+
 /// Represents all the ways that can fail to perform
 /// database related operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Hash)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum DatabaseErrorType {
     /// This error caused by connection issues from or to the
     /// Postgres database while trying to open a new connection
@@ -21,6 +24,7 @@ pub enum DatabaseErrorType {
 
 impl DatabaseErrorType {
     pub(crate) fn install_hook() {
+        crate::Error::install_serde_hook::<Self>();
         crate::Error::install_hook::<Self>(|_this, _ctx| {
             // practically nothing...
         });
@@ -33,6 +37,19 @@ impl DatabaseErrorType {
 pub struct PostgresErrorInfo {
     pub(crate) code: Option<String>,
     pub(crate) message: String,
+}
+
+impl Serialize for PostgresErrorInfo {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(3))?;
+        map.serialize_entry("_type", "POSTGRES_ERROR")?;
+        map.serialize_entry("code", &self.code)?;
+        map.serialize_entry("message", &self.message)?;
+        map.end()
+    }
 }
 
 impl PostgresErrorInfo {
@@ -49,6 +66,7 @@ impl PostgresErrorInfo {
 
 impl PostgresErrorInfo {
     pub(crate) fn install_hook() {
+        crate::Error::install_serde_hook::<Self>();
         crate::Error::install_hook::<Self>(|this, ctx| {
             if let Some(code) = this.code.as_deref() {
                 ctx.push_body(format!("postgres error code: {code}"));
