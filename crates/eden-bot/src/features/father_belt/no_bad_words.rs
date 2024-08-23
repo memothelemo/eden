@@ -2,6 +2,8 @@ use difference::{Changeset, Difference};
 use eden_utils::twilight::error::TwilightHttpErrorExt;
 use itertools::Itertools;
 use rand::Rng;
+use rustrict::Type;
+use std::sync::LazyLock;
 use tokio::task::spawn_blocking;
 use tracing::{instrument, trace, warn};
 use twilight_model::channel::Message;
@@ -92,6 +94,9 @@ const WARN_MESSAGES: &[&str] = &[
     "> *Do not let any unwholesome talk come out of your mouths, but only what is helpful for building others up according to their needs, that it may benefit those who listen.*\n> \n> Ephesians 4:29 (NIV)",
 ];
 
+const NO_BAD_WORDS_FILTER: LazyLock<Type> =
+    LazyLock::new(|| Type::OFFENSIVE | Type::PROFANE | Type::SEVERE);
+
 fn process_bad_words(content: &str) -> Vec<String> {
     let mut bad_words = Vec::new();
 
@@ -100,9 +105,10 @@ fn process_bad_words(content: &str) -> Vec<String> {
         // this will make my life easier when diff'ing strings later on
         let censored = super::init_censor!(original)
             .with_censor_first_character_threshold(*super::RUSTRICT_CONFIGURED_TYPE)
+            .with_censor_threshold(*NO_BAD_WORDS_FILTER)
             .censor();
 
-        if !dbg!(super::is_word_part_valid(&original, original, 0)) {
+        if !super::is_word_part_valid(&original, original, 0) {
             continue;
         }
 
@@ -137,14 +143,16 @@ mod tests {
     }
 
     #[test]
+    fn test_not_too_sensitive() {
+        assert!(process_bad_words("I hate ginger").is_empty());
+        assert!(process_bad_words("balls").is_empty());
+    }
+
+    #[test]
     fn test_issue_9_fix() {
         let user_id = Id::<UserMarker>::new(1234567890);
         let message = format!("Hi, {}", user_id.mention());
         assert!(process_bad_words(&message).is_empty());
-
-        let user_id = Id::<UserMarker>::new(1234567890);
-        let message = format!("Hi, {} bitch!", user_id.mention());
-        assert_eq!(process_bad_words(&message), &["bitch"]);
 
         let user_id = Id::<UserMarker>::new(1234567890);
         let message = format!("Hi, {} bitch!", user_id.mention());
