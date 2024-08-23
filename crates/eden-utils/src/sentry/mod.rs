@@ -107,10 +107,7 @@ fn omit_internal_error_traces(mut stacktrace: Stacktrace) -> Stacktrace {
         .into_iter()
         .filter_map(|v| {
             if let Some(function) = v.function.as_ref() {
-                let contains_error_trace =
-                    function.contains("capwat_error::") || function.contains("error_stack");
-
-                if contains_error_trace {
+                if function.contains("eden_utils::") || function.contains("error_stack") {
                     return None;
                 }
             }
