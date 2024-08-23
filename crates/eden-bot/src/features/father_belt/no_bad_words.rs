@@ -97,14 +97,14 @@ fn process_bad_words(content: &str) -> Vec<String> {
 
     // this is to avoid like in issue #9 but it will process words SLOWER
     for original in content.split_whitespace() {
-        if url::Url::parse(original).is_ok() {
-            continue;
-        }
-
         // this will make my life easier when diff'ing strings later on
         let censored = super::init_censor!(original)
             .with_censor_first_character_threshold(*super::RUSTRICT_CONFIGURED_TYPE)
             .censor();
+
+        if !dbg!(super::is_word_part_valid(&original, original, 0)) {
+            continue;
+        }
 
         let changeset = Changeset::new(original, &censored, "");
         for diff in changeset.diffs {
@@ -117,19 +117,44 @@ fn process_bad_words(content: &str) -> Vec<String> {
     bad_words
 }
 
+// This is just for testing purposes only and it is not
+// intended to hurt anyone. :)
+//
+// Sorry if your feelings got hurt because of these sentences.
 #[cfg(test)]
 mod tests {
+    use twilight_mention::Mention;
+    use twilight_model::id::{marker::UserMarker, Id};
+
     use super::*;
 
-    // This is just for testing purposes only and it is not
-    // intended to hurt anyone. :)
-    //
-    // Sorry if your feelings got hurt because of these sentences.
     #[test]
     fn test_process_bad_words() {
         assert_eq!(process_bad_words("How fucking dare you!"), &["fucking"]);
         assert_eq!(process_bad_words("Shit bitch"), &["shit", "bitch"]);
         assert_eq!(process_bad_words("shit bitch"), &["shit", "bitch"]);
         assert!(process_bad_words("No bad words here!").is_empty());
+    }
+
+    #[test]
+    fn test_issue_9_fix() {
+        let user_id = Id::<UserMarker>::new(1234567890);
+        let message = format!("Hi, {}", user_id.mention());
+        assert!(process_bad_words(&message).is_empty());
+
+        let user_id = Id::<UserMarker>::new(1234567890);
+        let message = format!("Hi, {} bitch!", user_id.mention());
+        assert_eq!(process_bad_words(&message), &["bitch"]);
+
+        let user_id = Id::<UserMarker>::new(1234567890);
+        let message = format!("Hi, {} bitch!", user_id.mention());
+        assert_eq!(process_bad_words(&message), &["bitch"]);
+
+        // it also happens to here as well
+        let message = "https://media.discordapp.net/attachmentsfuck/i?ex=6&is=66&hm=4f9dd&";
+        assert!(process_bad_words(&message).is_empty());
+
+        let message = "fuck https://media.discordapp.net/attachmentsfuck/i?ex=6&is=66&hm=4f9dd&";
+        assert_eq!(process_bad_words(&message), &["fuck"]);
     }
 }

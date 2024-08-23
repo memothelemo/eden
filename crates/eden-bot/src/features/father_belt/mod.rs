@@ -1,4 +1,5 @@
 use eden_utils::twilight::error::TwilightHttpErrorExt;
+use regex::Regex;
 use rustrict::{Trie, Type};
 use std::sync::LazyLock;
 use tracing::{instrument, trace, warn};
@@ -57,6 +58,36 @@ pub async fn on_message_create(ctx: &EventContext, message: &Message) {
             }
         }
     }
+}
+
+// From: https://github.com/memothelemo/eden/issues/9
+fn is_word_part_valid(processed: &str, original_content: &str, name_index: usize) -> bool {
+    static DISCORD_MENTION_TAG: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"<@[0-9]+>").unwrap());
+
+    if let Some(captures) = DISCORD_MENTION_TAG.captures(processed) {
+        // Do not return it as Some.
+        //
+        // Users will get advantage of the bug that allows the bot to ping the
+        // server administrator or any role and we don't want let it happend.
+        for id in 0..captures.len() {
+            if captures.get(id).is_some() {
+                return false;
+            }
+        }
+    }
+
+    // Checking if the finalized buffer comes from a URL part of the message.
+    // Related to issue #9.
+    let (left, right) = original_content.split_at(name_index);
+    let left = left.split_whitespace().last().unwrap_or("");
+    let right = right.split_whitespace().next().unwrap_or("");
+
+    let mut part = String::new();
+    part.push_str(left);
+    part.push_str(right);
+
+    url::Url::parse(&part).is_err()
 }
 
 // - Messages with only non-alphabetic characters are not considered as screaming
