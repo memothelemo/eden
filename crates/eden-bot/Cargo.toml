@@ -27,7 +27,9 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 
+difference = "2.0.0"
 pulldown-cmark = "0.11.0"
+rand = "*"
 regex = "*"
 rustrict = "0.7.26"
 itertools.workspace = true
