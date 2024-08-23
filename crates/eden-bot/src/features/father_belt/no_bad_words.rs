@@ -95,9 +95,13 @@ const WARN_MESSAGES: &[&str] = &[
     // copied from dad bot. sorry!
     "Listen here {USER_NAME}, I will not tolerate you saying the words that consist of the letters {BAD_WORDS} being said in this server, so take your own advice and close thine mouth in the name of the christian minecraft server owner.",
     "Did your mom told you not to say {BAD_WORDS} to everyone? If you have nothing nice to say in this server, then shut up!",
-    "You said {BAD_WORDS}. My goodness, you're a bad person!",
-    "Did you know that {BAD_WORDS} is/are bad words?",
+    "You said {BAD_WORDS}. My goodness, you're a bad person {USER_NAME}!",
+    "Did you know that saying {BAD_WORDS} is not nice?",
     "> *Do not let any unwholesome talk come out of your mouths, but only what is helpful for building others up according to their needs, that it may benefit those who listen.*\n> \n> Ephesians 4:29 (NIV)",
+    "Swear pa more! Sige ra!",
+    "Can you say something nice next time? Thank you for your cooperation! :)",
+    "Your message will be reported to the server administrators. Do not ever swear again!",
+    "Try to say {BAD_WORDS} again for me, please?",
 ];
 
 const NO_BAD_WORDS_FILTER: LazyLock<Type> =
