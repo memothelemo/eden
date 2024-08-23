@@ -1,6 +1,5 @@
 use eden_utils::{twilight::error::TwilightHttpErrorExt, Result};
 use regex::Regex;
-use rustrict::Censor;
 use std::sync::LazyLock;
 use tracing::{instrument, trace, warn};
 use twilight_mention::Mention;
@@ -12,17 +11,17 @@ use crate::events::EventContext;
 use crate::util::http::request_for_model;
 
 #[instrument(skip_all)]
-pub async fn on_trigger(ctx: &EventContext, message: &Message) {
+pub async fn on_trigger(ctx: &EventContext, message: &Message) -> bool {
     if message.guild_id.is_none() {
-        return;
+        return false;
     }
 
     let Some((name, index)) = get_supposed_name(&message.content) else {
-        return;
+        return false;
     };
 
     if !is_name_valid(&name, &message.content, index) {
-        return;
+        return false;
     }
 
     trace!("relying back introduction message");
@@ -36,6 +35,8 @@ pub async fn on_trigger(ctx: &EventContext, message: &Message) {
             warn!(%error, "could not respond back introduction message to the user");
         }
     }
+
+    true
 }
 
 // We don't want to let Eden say "Hi <swear word>" when the user said that so.
@@ -48,17 +49,7 @@ async fn respond(ctx: &EventContext, message: &Message, name: &str) -> Result<()
     let limit = original_size.clamp(1, 1500);
 
     // censor some profanity HAHAHAH
-    let mut name = Censor::from_str(&name[0..limit])
-        .with_censor_threshold(
-            rustrict::Type::INAPPROPRIATE
-                | rustrict::Type::EVASIVE
-                | rustrict::Type::OFFENSIVE
-                | rustrict::Type::SEVERE,
-        )
-        .with_ignore_self_censoring(true)
-        .with_censor_replacement('x')
-        .censor();
-
+    let mut name = super::init_censor!(&name[0..limit]).censor();
     if name.len() != limit {
         name.push_str("...");
     }

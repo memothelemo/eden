@@ -1,4 +1,6 @@
 use eden_utils::twilight::error::TwilightHttpErrorExt;
+use rustrict::Type;
+use std::sync::LazyLock;
 use tracing::{instrument, trace, warn};
 use twilight_model::channel::Message;
 
@@ -6,10 +8,30 @@ use crate::events::EventContext;
 use crate::util::http::request_for_model;
 
 mod introduce;
+mod no_bad_words;
+
+const RUSTRICT_CONFIGURED_TYPE: LazyLock<Type> =
+    LazyLock::new(|| Type::INAPPROPRIATE | Type::EVASIVE | Type::OFFENSIVE | Type::SEVERE);
+
+macro_rules! init_censor {
+    ($s:expr) => {
+        rustrict::Censor::from_str($s)
+            .with_censor_threshold(*crate::features::father_belt::RUSTRICT_CONFIGURED_TYPE)
+            .with_ignore_self_censoring(true)
+            .with_censor_replacement('x')
+    };
+}
+use init_censor;
 
 #[instrument(skip_all)]
 pub async fn on_message_create(ctx: &EventContext, message: &Message) {
-    self::introduce::on_trigger(ctx, message).await;
+    if self::introduce::on_trigger(ctx, message).await {
+        return;
+    }
+
+    if self::no_bad_words::on_trigger(ctx, message).await {
+        return;
+    }
 
     // TODO: check channel permissions first before sending the message
     if is_screaming(&message.content) && message.guild_id.is_some() {
