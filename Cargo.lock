@@ -793,7 +793,7 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "eden"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "eden-bot",
  "eden-settings",
@@ -810,7 +810,7 @@ dependencies = [
 
 [[package]]
 name = "eden-bot"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "chrono",
  "dashmap 6.0.1",
@@ -849,7 +849,7 @@ dependencies = [
 
 [[package]]
 name = "eden-discord-types"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "eden-utils",
  "serde",
@@ -859,7 +859,7 @@ dependencies = [
 
 [[package]]
 name = "eden-schema"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "chrono",
  "eden-utils",
@@ -877,7 +877,7 @@ dependencies = [
 
 [[package]]
 name = "eden-settings"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "config",
  "doku",
@@ -895,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "eden-tasks"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -922,7 +922,7 @@ dependencies = [
 
 [[package]]
 name = "eden-tasks-schema"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "chrono",
  "eden-utils",
@@ -937,7 +937,7 @@ dependencies = [
 
 [[package]]
 name = "eden-utils"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4533,7 +4533,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "clap",
  "eden-settings",

@@ -27,6 +27,8 @@ use tracing::{debug, info, trace, warn};
 
 #[tracing::instrument(skip_all, name = "start_bot")]
 pub async fn start(settings: Arc<Settings>) -> Result<(), StartBotError> {
+    self::features::father_belt::install();
+
     let bot = Bot::new(settings);
     // Run migrations first before starting the bot process entirely
     perform_database_migrations(&bot)

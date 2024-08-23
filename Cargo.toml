@@ -3,7 +3,7 @@ members = ["crates/*", "eden", "xtask"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 authors = ["memothelemo <dev@memothelemo.xyz>"]
 edition = "2021"
 license = "AGPL-2.0"
