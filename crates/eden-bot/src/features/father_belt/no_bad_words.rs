@@ -2,6 +2,8 @@ use difference::{Changeset, Difference};
 use eden_utils::twilight::error::TwilightHttpErrorExt;
 use itertools::Itertools;
 use rand::Rng;
+use rustrict::{Trie, Type};
+use std::sync::LazyLock;
 use tokio::task::spawn_blocking;
 use tracing::{instrument, trace, warn};
 use twilight_model::channel::Message;
@@ -92,6 +94,38 @@ const WARN_MESSAGES: &[&str] = &[
     "> *Do not let any unwholesome talk come out of your mouths, but only what is helpful for building others up according to their needs, that it may benefit those who listen.*\n> \n> Ephesians 4:29 (NIV)",
 ];
 
+static FILIPINO_BAD_WORDS: LazyLock<Trie> = LazyLock::new(|| {
+    let mut trie = Trie::new();
+    trie.set("gago", Type::PROFANE);
+    trie.set("gaga", Type::PROFANE);
+    trie.set("yawa", Type::PROFANE);
+    trie.set("puta", Type::PROFANE);
+    trie.set("putang", Type::PROFANE);
+    trie.set("putang", Type::PROFANE);
+    trie.set("tangina", Type::PROFANE);
+    trie.set("bobo", Type::PROFANE);
+    trie.set("syet", Type::PROFANE);
+    trie.set("buwisit", Type::PROFANE);
+    trie.set("bwisit", Type::PROFANE);
+    trie.set("amputa", Type::PROFANE);
+    trie.set("bilat", Type::PROFANE);
+    trie.set("gagi", Type::PROFANE);
+    trie.set("iyot", Type::PROFANE);
+    trie.set("leche", Type::PROFANE);
+    trie.set("lintik", Type::PROFANE);
+    trie.set("shet", Type::PROFANE);
+    trie.set("puke", Type::PROFANE);
+    trie.set("suso", Type::PROFANE);
+    trie.set("tae", Type::PROFANE);
+    trie.set("taena", Type::PROFANE);
+    trie.set("tete", Type::PROFANE);
+    trie.set("tite", Type::PROFANE);
+    trie.set("titi", Type::PROFANE);
+    trie.set("ungas", Type::PROFANE);
+    trie.set("tanga", Type::PROFANE);
+    trie
+});
+
 fn process_bad_words(content: &str) -> Vec<String> {
     let mut bad_words = Vec::new();
 
@@ -104,6 +138,7 @@ fn process_bad_words(content: &str) -> Vec<String> {
         // this will make my life easier when diff'ing strings later on
         let censored = super::init_censor!(original)
             .with_censor_first_character_threshold(*super::RUSTRICT_CONFIGURED_TYPE)
+            .with_trie(&FILIPINO_BAD_WORDS)
             .censor();
 
         let changeset = Changeset::new(original, &censored, "");
