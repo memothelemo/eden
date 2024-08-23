@@ -17,6 +17,12 @@ pub async fn on_trigger(ctx: &EventContext, message: &Message) -> bool {
         return false;
     }
 
+    // It's a bit annoying to let the bot warn you every time you
+    // said a swear word. Let's make it by chance!
+    if rand::random::<bool>() {
+        return false;
+    }
+
     // We only limit up to 1500 characters unfortunately :)
     let limit = message.content.len().clamp(1, 1500);
     let original = message.content[..limit].to_string();
