@@ -42,6 +42,7 @@ twilight-model.workspace = true
 twilight-interactions.workspace = true
 twilight-util = { version = "0.15.2", features = ["builder", "permission-calculator", "snowflake"] }
 reqwest = { version = "0.12.5", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "rustls-tls-webpki-roots", "brotli", "zstd", "deflate"] }
+url = "2.5.2"
 
 [lints]
 workspace = true
