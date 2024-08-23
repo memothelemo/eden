@@ -38,7 +38,6 @@ pub fn from_error(
                     .description(consts::NOT_ALLOWED_MSG)
                     .build()
             }
-            // TODO: Make lacking permissions easier to read
             GuildErrorCategory::MissingChannelPermissions(permissions) => {
                 let footer = if admin_mode {
                     consts::ADMIN_MISSING_PERMS_FOOTER

@@ -365,7 +365,6 @@ async fn handle_command<'a, T: CommandModel + RunCommand>(
             format!("could not parse {:?} command from interaction", T::NAME)
         })?;
 
-    // TODO: guild permission checks
     let guild_ctx = LocalGuildContext::from_ctx(ctx).await.ok();
     if let Some(ctx) = guild_ctx {
         let permissions = ctx.member.permissions.unwrap_or_else(Permissions::empty);
